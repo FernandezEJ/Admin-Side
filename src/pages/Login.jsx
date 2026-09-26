@@ -1,13 +1,19 @@
 import LogoMascot from '../assets/LogoMascot.png';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { useAdminSession } from '../auth/useAdminSession';
 
 function Login() {
+  const { login, isAuthenticated } = useAdminSession();
+  const navigate = useNavigate();
+
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+
   const handleSubmit = (event) => {
     event.preventDefault();
 
-    // BACKEND READY:
-    // Laravel admin login request will be connected here later.
-    // After successful credential validation, this flow can continue
-    // to the email OTP verification step before opening the dashboard.
+    // Mock only: credentials are neither transmitted nor persisted.
+    login({ remember: new FormData(event.currentTarget).has('remember') });
+    navigate('/dashboard', { replace: true });
   };
 
   return (

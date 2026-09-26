@@ -1,49 +1,26 @@
 @import "tailwindcss";
 
-@media print {
-  @page {
-    size: A4 portrait;
-    margin: 12mm;
-  }
+/* Only the compact navigation hides its scrollbar; wheel, touch and keyboard scroll remain. */
+.quiet-scroll { scrollbar-width: none; }
+.quiet-scroll::-webkit-scrollbar { display: none; }
+main .grid > * { min-width: 0; }
+main table td { overflow-wrap: anywhere; }
+main input, main select, main textarea { max-width: 100%; }
+button, a, input, select, textarea { touch-action: manipulation; }
+:focus-visible { outline: 2px solid #b7192e; outline-offset: 3px; }
 
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
+/* Form fields use their existing border as the sole focus indicator.
+   Keep the global outline for buttons, links, and non-text input controls. */
+:is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="button"], [type="submit"], [type="reset"], [type="image"], [type="hidden"]), textarea, select):focus {
+  outline: none;
+  box-shadow: none;
+}
 
-  html,
-  body {
-    background: white;
-  }
+:is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="button"], [type="submit"], [type="reset"], [type="image"], [type="hidden"]), textarea, select):focus:not([aria-invalid="true"]):not(:user-invalid) {
+  border-color: #b7192e;
+}
 
-  body {
-    margin: 0;
-  }
-
-  #monthly-report {
-    width: 100%;
-    max-width: none;
-    margin: 0;
-    box-shadow: none;
-  }
-
-  #monthly-report section,
-  #monthly-report article {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  svg {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  table {
-    break-inside: auto;
-  }
-
-  tr {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
+@media (max-width: 639px) {
+  main .fixed > div { max-height: 90dvh; overflow-y: auto; }
+  main .flex.gap-5, main .flex.gap-7 { flex-wrap: wrap; }
 }

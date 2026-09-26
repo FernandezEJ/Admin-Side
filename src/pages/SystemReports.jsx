@@ -1,17 +1,13 @@
+import ReportChart from '../components/ReportChart';
+import { EmptyState } from '../components/ui/PageState';
 import { useState } from 'react';
 import {
   Printer,
   FileText,
-  Users,
-  BadgeCheck,
-  Clock3,
-  CircleX,
-  Gift,
-  Coins,
 } from 'lucide-react';
 
 import {
-  ResponsiveContainer,
+
   BarChart,
   Bar,
   XAxis,
@@ -25,119 +21,36 @@ import {
 
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
+import { defaultReportPeriod, generateMockReport, reportMonths, reportYears, reportPeriodLabel } from '../data/systemReports';
+import '../styles/system-reports.css';
 
-function Reports() {
-  // ============================================================
-  // Report Filters
-  // ============================================================
-
-  const [selectedMonth, setSelectedMonth] = useState('09');
-  const [selectedYear, setSelectedYear] = useState('2026');
-
-  const months = [
-    ['01', 'January'],
-    ['02', 'February'],
-    ['03', 'March'],
-    ['04', 'April'],
-    ['05', 'May'],
-    ['06', 'June'],
-    ['07', 'July'],
-    ['08', 'August'],
-    ['09', 'September'],
-    ['10', 'October'],
-    ['11', 'November'],
-    ['12', 'December'],
-  ];
-
-  const years = ['2026', '2025', '2024'];
-
-  // ============================================================
-  // Temporary Monthly Report Data
-  // Laravel will provide this later.
-  // ============================================================
-
-  const reportData = {
-    totalDonors: 245,
-    eligibleDonors: 183,
-    temporarilyIneligible: 62,
-
-    completedDonations: 48,
-    forVerification: 12,
-    rejected: 4,
-
-    vouchersRedeemed: 23,
-    pointsUsed: 6750,
-  };
-
-  const donationActivity = [
-    { week: 'Week 1', donations: 9 },
-    { week: 'Week 2', donations: 13 },
-    { week: 'Week 3', donations: 11 },
-    { week: 'Week 4', donations: 15 },
-  ];
-
-  const bloodTypeDistribution = [
-    { name: 'A+', value: 34 },
-    { name: 'A-', value: 9 },
-    { name: 'B+', value: 27 },
-    { name: 'B-', value: 7 },
-    { name: 'AB+', value: 18 },
-    { name: 'AB-', value: 5 },
-    { name: 'O+', value: 39 },
-    { name: 'O-', value: 12 },
-  ];
-
-  const bloodTypeColors = [
-  '#b7192e',
-  '#d95b6a',
-  '#ef8b96',
-  '#f5b7be',
-  '#7f1d1d',
-  '#991b1b',
-  '#c2410c',
-  '#ea580c',
-];
-
-  const completedDonations = [
-    {
-      id: 1,
-      donor: 'Juan Dela Cruz',
-      bloodType: 'O+',
-      event: 'LifeFlow Blood Donation Drive',
-      date: '2026-09-04',
-    },
-    {
-      id: 2,
-      donor: 'Maria Santos',
-      bloodType: 'A+',
-      event: 'Community Blood Donation',
-      date: '2026-09-10',
-    },
-    {
-      id: 3,
-      donor: 'Carlo Reyes',
-      bloodType: 'B+',
-      event: 'LifeFlow Blood Donation Drive',
-      date: '2026-09-14',
-    },
-  ];
-
-  const rewardRedemptions = [
-    {
-      id: 1,
-      donor: 'Juan Dela Cruz',
-      voucher: '₱500 Grocery Voucher',
-      pointsUsed: 350,
-      date: '2026-09-15',
-    },
-    {
-      id: 2,
-      donor: 'Maria Santos',
-      voucher: '₱300 Grocery Voucher',
-      pointsUsed: 250,
-      date: '2026-09-12',
-    },
-  ];
+function SystemReports() {
+  const [selectedMonth, setSelectedMonth] = useState(defaultReportPeriod.slice(5));
+  const [selectedYear, setSelectedYear] = useState(defaultReportPeriod.slice(0, 4));
+  const [snapshot, setSnapshot] = useState(() => generateMockReport(defaultReportPeriod));
+  const months = reportMonths;
+  const years = reportYears;
+  const report = snapshot.data;
+  const reportData = report ? {
+    totalDonors: report.donor_summary.total,
+    eligibleDonors: report.donor_summary.eligible,
+    temporarilyIneligible: report.donor_summary.not_eligible,
+    completedDonations: report.donation_summary.completed,
+    forVerification: report.donation_summary.pending,
+    rejected: report.donation_summary.rejected,
+    vouchersRedeemed: report.rewards_summary.total_redemptions,
+    pointsUsed: report.rewards_summary.points_redeemed,
+  } : null;
+  const donationActivity = report?.weekly_donations ?? [];
+  const bloodTypeDistribution = report?.blood_types ?? [];
+  const completedDonations = report?.completed_donations ?? [];
+  const rewardRedemptions = report?.reward_redemptions ?? [];
+  const bloodTypeColors = ['#b7192e', '#d95b6a', '#ef8b96', '#f5b7be', '#7f1d1d', '#991b1b', '#c2410c', '#ea580c'];
+  const periodLabel = reportPeriodLabel(snapshot.period);
+  const unapplied = selectedYear + '-' + selectedMonth !== snapshot.period;
+  const generatedLabel = new Intl.DateTimeFormat('en-PH', {
+    timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short',
+  }).format(new Date(snapshot.generated_at));
 
   // ============================================================
   // Helpers
@@ -153,20 +66,8 @@ function Reports() {
     });
   };
 
-  const selectedMonthName =
-    months.find(([value]) => value === selectedMonth)?.[1] ||
-    'September';
-
-  // ============================================================
-  // Generate Report
-  // Later this can trigger a Laravel API request.
-  // ============================================================
-
   const handleGenerateReport = () => {
-    console.log({
-      month: selectedMonth,
-      year: selectedYear,
-    });
+    setSnapshot(generateMockReport(selectedYear + '-' + selectedMonth));
   };
 
   // ============================================================
@@ -179,7 +80,7 @@ function Reports() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f7f8fa]">
+    <div className="system-reports-page flex min-h-screen bg-[#f7f8fa]">
       {/* Hidden when printing */}
       <div className="print:hidden">
         <Sidebar />
@@ -189,12 +90,12 @@ function Reports() {
         {/* Hidden when printing */}
         <div className="print:hidden">
           <Header
-            title="Reports"
+            title="System Reports"
             description="Generate and print monthly LifeFlow administrative reports."
           />
         </div>
 
-        <div className="p-8 print:p-0">
+        <div className="p-4 lg:p-8 print:p-0">
           {/* ==================================================
               Page Controls
               ================================================== */}
@@ -211,6 +112,7 @@ function Reports() {
 
             <div className="flex flex-wrap gap-3">
               <select
+                aria-label="Report month"
                 value={selectedMonth}
                 onChange={(event) =>
                   setSelectedMonth(event.target.value)
@@ -225,6 +127,7 @@ function Reports() {
               </select>
 
               <select
+                aria-label="Report year"
                 value={selectedYear}
                 onChange={(event) =>
                   setSelectedYear(event.target.value)
@@ -243,26 +146,38 @@ function Reports() {
                 onClick={handleGenerateReport}
                 className="h-11 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
               >
-                Generate Report
+                Apply / Generate Report
               </button>
 
               <button
                 type="button"
                 onClick={handlePrint}
-                className="flex h-11 items-center gap-2 rounded-xl bg-[#b7192e] px-5 text-sm font-semibold text-white transition hover:bg-[#9f1427]"
+                disabled={!report || unapplied}
+                className="flex h-11 items-center gap-2 rounded-xl bg-[#b7192e] px-5 text-sm font-semibold text-white transition hover:bg-[#9f1427] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Printer size={17} />
-                Print Report
+                Print / Save as PDF
               </button>
             </div>
           </section>
 
+          <p role="status" className="mb-4 text-sm text-gray-500 print:hidden">
+            {unapplied ? 'Filters changed. Apply to update the preview.' : 'Showing ' + periodLabel + '.'}
+            {' '}Mock data: September 2026, August 2026, and September 2025.
+            {' '}Choose Save as PDF in the browser print dialog to export.
+          </p>
+          {!report ? (
+            <section className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
+              <h2 className="text-xl font-bold">System Reports: {periodLabel}</h2>
+              <EmptyState title="No mock report data for this month" description="Select an available period and apply." />
+            </section>
+          ) : <>
           {/* ==================================================
               Printable Report
               ================================================== */}
           <section
             id="monthly-report"
-            className="mx-auto max-w-7xl space-y-6 rounded-2xl border border-gray-200 bg-white p-8 print:max-w-none print:rounded-none print:border-0 print:p-0"
+            className="mx-auto max-w-7xl space-y-6 rounded-2xl border border-gray-200 bg-white p-4 lg:p-8 print:max-w-none print:rounded-none print:border-0 print:p-0"
           >
             {/* Report Header */}
             <header className="border-b border-gray-200 pb-6 text-center">
@@ -275,18 +190,18 @@ function Reports() {
               </h1>
 
               <h2 className="mt-1 text-lg font-semibold text-gray-700">
-                Monthly Administrative Report
+                System Reports
               </h2>
 
               <p className="mt-1 text-sm text-gray-400">
-                {selectedMonthName} {selectedYear}
+                {periodLabel}
               </p>
             </header>
 
             {/* ==================================================
                 Minimalist Report Summary
                 ================================================== */}
-            <section className="grid gap-6 lg:grid-cols-3">
+            <section className="report-summary grid gap-6 lg:grid-cols-3">
             {/* Donor Summary */}
             <article>
                 <h3 className="mb-3 border-b border-gray-200 pb-2 text-sm font-bold uppercase tracking-wide text-gray-500">
@@ -316,7 +231,7 @@ function Reports() {
 
                 <div className="flex items-center justify-between gap-4 text-sm">
                     <span className="text-gray-500">
-                    Temporarily Ineligible
+                    Not Eligible
                     </span>
 
                     <span className="font-bold text-gray-800">
@@ -333,6 +248,8 @@ function Reports() {
                 </h3>
 
                 <div className="space-y-2">
+                <div className="flex justify-between gap-4 text-sm"><span className="text-gray-500">Total Participations</span><strong>{report.donation_summary.total}</strong></div>
+                <div className="flex justify-between gap-4 text-sm"><span className="text-gray-500">Needs Revision</span><strong>{report.donation_summary.needs_revision}</strong></div>
                 <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">
                     Completed Donations
@@ -372,9 +289,11 @@ function Reports() {
                 </h3>
 
                 <div className="space-y-2">
+                <div className="flex justify-between gap-4 text-sm"><span className="text-gray-500">Points Issued</span><strong>{report.rewards_summary.points_issued.toLocaleString()}</strong></div>
+                <div className="flex justify-between gap-4 text-sm"><span className="text-gray-500">Most Redeemed Reward</span><strong className="max-w-40 text-right">{report.rewards_summary.most_redeemed_reward}</strong></div>
                 <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">
-                    Vouchers Redeemed
+                    Total Redemptions
                     </span>
 
                     <span className="font-bold text-gray-800">
@@ -384,7 +303,7 @@ function Reports() {
 
                 <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">
-                    Points Used
+                    Points Redeemed
                     </span>
 
                     <span className="font-bold text-gray-800">
@@ -398,7 +317,7 @@ function Reports() {
             {/* ==================================================
                 Charts
                 ================================================== */}
-            <section className="grid gap-6 xl:grid-cols-2">
+            <section className="report-charts grid gap-6 xl:grid-cols-2">
               {/* Donation Activity */}
               <article className="rounded-xl border border-gray-200 p-5">
                 <h3 className="font-bold text-gray-800">
@@ -406,11 +325,11 @@ function Reports() {
                 </h3>
 
                 <p className="mt-1 text-sm text-gray-400">
-                  Completed donations by week.
+                  Completed donations by week: days 1-7, 8-14, 15-21, 22-28, and 29-month end.
                 </p>
 
                 <div className="mt-5 h-72">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ReportChart>
                     <BarChart data={donationActivity}>
                       <CartesianGrid
                         strokeDasharray="3 3"
@@ -430,13 +349,15 @@ function Reports() {
                       <Tooltip />
 
                       <Bar
+                        isAnimationActive={false}
                         dataKey="donations"
                         fill="#b7192e"
                         radius={[6, 6, 0, 0]}
                       />
                     </BarChart>
-                  </ResponsiveContainer>
+                  </ReportChart>
                 </div>
+                <p className="mt-3 text-xs text-gray-600">{donationActivity.map((week) => week.week + ': ' + week.donations).join(' / ')}</p>
               </article>
 
               {/* Blood Type Distribution */}
@@ -452,9 +373,10 @@ function Reports() {
   <div className="mt-5 flex flex-col items-center gap-5 lg:flex-row">
     {/* Pie Chart */}
     <div className="h-64 w-full lg:w-[60%]">
-      <ResponsiveContainer width="100%" height="100%">
+      <ReportChart>
         <PieChart>
           <Pie
+            isAnimationActive={false}
             data={bloodTypeDistribution}
             dataKey="value"
             nameKey="name"
@@ -476,7 +398,7 @@ function Reports() {
 
           <Tooltip />
         </PieChart>
-      </ResponsiveContainer>
+      </ReportChart>
     </div>
 
                     {/* Blood Type Legend */}
@@ -517,11 +439,11 @@ function Reports() {
                 ================================================== */}
             <section>
               <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">
-                Completed Donations
+                Completed Donations (Sample Records)
               </h3>
 
-              <div className="overflow-hidden rounded-xl border border-gray-200">
-                <table className="w-full table-fixed text-left">
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full min-w-[640px] table-fixed text-left">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="w-[28%] px-4 py-3 text-xs font-semibold uppercase text-gray-400">
@@ -575,11 +497,11 @@ function Reports() {
                 ================================================== */}
             <section>
               <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">
-                Reward Redemptions
+                Reward Redemptions (Sample Records)
               </h3>
 
-              <div className="overflow-hidden rounded-xl border border-gray-200">
-                <table className="w-full table-fixed text-left">
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full min-w-[640px] table-fixed text-left">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="w-[28%] px-4 py-3 text-xs font-semibold uppercase text-gray-400">
@@ -631,20 +553,26 @@ function Reports() {
             {/* ==================================================
                 Report Footer
                 ================================================== */}
+            <section className="text-sm text-gray-600">
+              <h3 className="mb-2 font-bold">Monthly Notes</h3>
+              <p>{report.notes}</p>
+              <p className="mt-2">Generated on: {generatedLabel} (Philippine time, UTC+8)</p>
+            </section>
             <footer className="border-t border-gray-200 pt-5 text-center">
               <p className="text-xs text-gray-400">
-                LifeFlow Monthly Administrative Report
+                LifeFlow System Reports
               </p>
 
               <p className="mt-1 text-xs text-gray-400">
-                Report Period: {selectedMonthName} {selectedYear}
+                Report Period: {periodLabel}
               </p>
             </footer>
           </section>
+          </>}
         </div>
       </main>
     </div>
   );
 }
 
-export default Reports;
+export default SystemReports;

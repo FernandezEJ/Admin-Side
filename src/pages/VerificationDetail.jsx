@@ -241,7 +241,7 @@ function VerificationDetail() {
   const getStatusBadge = (status) => {
     if (status === 'for_verification') {
       return (
-        <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+        <span className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-[#b7192e]">
           <Clock3 size={14} />
           For Verification
         </span>
@@ -267,7 +267,7 @@ function VerificationDetail() {
     }
 
     return (
-      <span className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
+      <span className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold text-red-700">
         <XCircle size={14} />
         Rejected
       </span>
@@ -420,7 +420,7 @@ function VerificationDetail() {
           description="Review the donor's submitted proof before making a decision."
         />
 
-        <div className="p-8">
+        <div className="p-4 lg:p-8">
           <div className="mx-auto max-w-6xl">
             {/* ==================================================
                 Back Button
@@ -575,7 +575,7 @@ function VerificationDetail() {
                   {/* Final Rejection Reason */}
                   {verification.status === 'rejected' &&
                     verification.rejectionReason && (
-                      <div className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4">
+                      <div className="mt-5 rounded-xl border border-gray-200 bg-red-50 p-4">
                         <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
                           Final Rejection Reason
                         </p>
@@ -736,7 +736,7 @@ function VerificationDetail() {
           ======================================================== */}
       {showRevisionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:p-6">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
                 <RotateCcw size={21} />
@@ -816,7 +816,7 @@ function VerificationDetail() {
           ======================================================== */}
       {showRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:p-6">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
                 <XCircle size={21} />
@@ -834,7 +834,7 @@ function VerificationDetail() {
               </div>
             </div>
 
-            <div className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4">
+            <div className="mt-5 rounded-xl border border-gray-200 bg-red-50 p-4">
               <p className="text-sm leading-6 text-red-700">
                 This is different from requesting a revision. The
                 donor will not be able to simply upload another proof
@@ -859,7 +859,7 @@ function VerificationDetail() {
                 maxLength={500}
                 rows={5}
                 placeholder="Enter the reason for permanently rejecting this verification."
-                className="w-full resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                className="w-full resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-red-500 "
               />
 
               <div className="mt-2 flex justify-between gap-4">

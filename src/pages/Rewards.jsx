@@ -1,3 +1,7 @@
+import MonthFilter from '../components/ui/MonthFilter';
+import { recoveryDates, clearRecoveryDates, isRecoverable } from '../data/recoveryPolicy';
+import { mockRedemptions, filterRedemptions } from '../data/rewardRedemptions';
+import { EmptyState } from '../components/ui/PageState';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,6 +19,7 @@ import {
 
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
+import RewardsAnalytics from '../components/rewards/RewardsAnalytics';
 
 function Rewards() {
   const navigate = useNavigate();
@@ -66,6 +71,7 @@ function Rewards() {
       pointsRequired: 100,
       stock: 10,
       status: 'deleted',
+              ...recoveryDates('2026-09-20T08:00:00Z'),
     },
   ]);
 
@@ -73,33 +79,9 @@ function Rewards() {
   // Temporary Redemption Data
   // ============================================================
 
-  const redemptions = [
-    {
-      id: 1,
-      donor: 'Juan Dela Cruz',
-      reward: '₱500 Grocery Voucher',
-      pointsUsed: 350,
-      redeemedDate: '2026-09-16',
-      status: 'available',
-    },
-    {
-      id: 2,
-      donor: 'Maria Santos',
-      reward: '₱300 Grocery Voucher',
-      pointsUsed: 250,
-      redeemedDate: '2026-09-15',
-      status: 'active',
-    },
-    {
-      id: 3,
-      donor: 'Carlo Reyes',
-      reward: '₱200 Grocery Voucher',
-      pointsUsed: 150,
-      redeemedDate: '2026-09-12',
-      status: 'expired',
-    },
-  ];
-
+  const [redemptionStatus, setRedemptionStatus] = useState('');
+  const [redemptionMonth, setRedemptionMonth] = useState('');
+  const redemptions = filterRedemptions(mockRedemptions, redemptionStatus, redemptionMonth);
   // ============================================================
   // Fixed Grocery Voucher Values
   // ============================================================
@@ -186,7 +168,7 @@ function Rewards() {
 
   const handleDelete = (id) => {
     const confirmed = window.confirm(
-      'Move this grocery voucher to Deleted?'
+      'Move this grocery voucher to Deleted? Recoverable for 30 days; permanent purge is handled later by the backend.'
     );
 
     if (!confirmed) return;
@@ -197,6 +179,7 @@ function Rewards() {
           ? {
               ...reward,
               status: 'deleted',
+              ...recoveryDates(),
             }
           : reward
       )
@@ -209,6 +192,7 @@ function Rewards() {
   // ============================================================
 
   const handleRestore = (id) => {
+    if (!isRecoverable(rewards.find((item) => item.id === id) ?? {})) return;
     const confirmed = window.confirm(
       'Restore this reward to Inactive?'
     );
@@ -220,6 +204,7 @@ function Rewards() {
         reward.id === id
           ? {
               ...reward,
+              ...clearRecoveryDates(),
               status: 'inactive',
             }
           : reward
@@ -251,7 +236,7 @@ function Rewards() {
     }
 
     return (
-      <span className="inline-flex rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
+      <span className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-red-700">
         Deleted
       </span>
     );
@@ -262,10 +247,10 @@ function Rewards() {
   // ============================================================
 
   const renderRedemptionStatus = (status) => {
-    if (status === 'available') {
+    if (status === 'inactive') {
       return (
         <span className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-          Available
+          Inactive
         </span>
       );
     }
@@ -295,11 +280,11 @@ function Rewards() {
           description="Manage grocery vouchers and donor redemptions."
         />
 
-        <div className="space-y-6 p-8">
+        <div className="space-y-6 p-4 lg:p-8">
           {/* ==================================================
               Page Heading
               ================================================== */}
-          <section className="flex flex-wrap items-center justify-between gap-4">
+          <section hidden={activeTab === 'analytics'} className={activeTab === 'analytics' ? 'hidden' : 'flex flex-wrap items-center justify-between gap-4'}>
             <div>
               <h2 className="text-lg font-bold text-gray-800">
                 Grocery Voucher Management
@@ -326,7 +311,7 @@ function Rewards() {
           {/* ==================================================
               Summary Cards
               ================================================== */}
-          <section className="grid gap-4 md:grid-cols-4">
+          <section className={activeTab === 'analytics' ? 'hidden' : 'grid gap-4 sm:grid-cols-2 xl:grid-cols-4'}>
             <article className="rounded-2xl border border-gray-200 bg-white p-5">
               <div className="flex items-center justify-between">
                 <div>
@@ -409,22 +394,24 @@ function Rewards() {
                 ================================================== */}
             <div className="flex flex-wrap items-end justify-between gap-4 border-b border-gray-200 px-6 pt-5">
               {/* Main tabs */}
-              <div className="flex gap-7">
+              <div className="flex flex-wrap gap-7" aria-label="Rewards sections">
                 <button
                   type="button"
                   onClick={() => setActiveTab('rewards')}
+                  aria-pressed={activeTab === 'rewards'}
                   className={`border-b-2 pb-4 text-sm font-semibold transition ${
                     activeTab === 'rewards'
                       ? 'border-[#b7192e] text-[#b7192e]'
                       : 'border-transparent text-gray-400 hover:text-gray-700'
                   }`}
                 >
-                  Rewards
+                  Reward Management
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setActiveTab('redemptions')}
+                  aria-pressed={activeTab === 'redemptions'}
                   className={`border-b-2 pb-4 text-sm font-semibold transition ${
                     activeTab === 'redemptions'
                       ? 'border-[#b7192e] text-[#b7192e]'
@@ -432,6 +419,19 @@ function Rewards() {
                   }`}
                 >
                   Redemptions
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('analytics')}
+                  aria-pressed={activeTab === 'analytics'}
+                  aria-controls="rewards-analytics"
+                  className={`border-b-2 pb-4 text-sm font-semibold transition ${
+                    activeTab === 'analytics'
+                      ? 'border-[#b7192e] text-[#b7192e]'
+                      : 'border-transparent text-gray-400 hover:text-gray-700'
+                  }`}
+                >
+                  Analytics
                 </button>
               </div>
 
@@ -460,6 +460,10 @@ function Rewards() {
               )}
             </div>
 
+            <div id="rewards-analytics" hidden={activeTab !== 'analytics'}>
+              <RewardsAnalytics inventory={rewards} />
+            </div>
+
             {/* ==================================================
                 Rewards Tab
                 ================================================== */}
@@ -467,7 +471,7 @@ function Rewards() {
               <>
                 {/* Search and Filters */}
                 <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">
-                  <div className="relative min-w-64 flex-1">
+                  <div className="relative min-w-0 w-full sm:min-w-64 flex-1">
                     <Search
                       size={17}
                       className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -539,6 +543,7 @@ function Rewards() {
                             </div>
 
                             {renderRewardStatus(reward.status)}
+                            {reward.status === 'deleted' && <p className="mt-2 text-xs text-gray-500">Recoverable for 30 days. Deletion scheduled: {reward.scheduled_for_deletion_at?.slice(0, 10)}. No automatic purge in preview.</p>}
                           </div>
 
                           {/* Points and Stock */}
@@ -592,7 +597,7 @@ function Rewards() {
                             {reward.status === 'deleted' && (
                               <button
                                 type="button"
-                                title="Restore to Inactive"
+                                disabled={!isRecoverable(reward)} title={isRecoverable(reward) ? 'Restore' : 'Recovery period ended; awaiting backend purge'}
                                 onClick={() =>
                                   handleRestore(reward.id)
                                 }
@@ -606,20 +611,7 @@ function Rewards() {
                       </article>
                     ))
                   ) : (
-                    <div className="col-span-full py-12 text-center">
-                      <Gift
-                        size={32}
-                        className="mx-auto text-gray-300"
-                      />
-
-                      <p className="mt-3 text-sm font-semibold text-gray-500">
-                        No grocery vouchers found.
-                      </p>
-
-                      <p className="mt-1 text-xs text-gray-400">
-                        Try changing the selected filters.
-                      </p>
-                    </div>
+                    <div className="col-span-full"><EmptyState title="No grocery vouchers found" /></div>
                   )}
                 </div>
               </>
@@ -628,9 +620,13 @@ function Rewards() {
             {/* ==================================================
                 Redemptions Tab
                 ================================================== */}
-            {activeTab === 'redemptions' && (
-              <div className="w-full overflow-hidden">
-                <table className="w-full table-fixed text-left">
+            {activeTab === 'redemptions' && (<>
+              <div className="flex flex-wrap items-end gap-4 border-b border-gray-200 p-4">
+                <label className="text-sm text-gray-600">Status<select value={redemptionStatus} onChange={(event) => setRedemptionStatus(event.target.value)} className="mt-2 block h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="expired">Expired</option></select></label>
+                <MonthFilter value={redemptionMonth} onChange={setRedemptionMonth} />
+              </div>
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[640px] table-fixed text-left">
                   <thead>
                     <tr className="border-b border-gray-100">
                       <th className="w-[22%] px-5 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -687,7 +683,8 @@ function Rewards() {
                   </tbody>
                 </table>
               </div>
-            )}
+              {!redemptions.length && <EmptyState title="No redemptions found" />}
+              </>)}
           </section>
         </div>
       </main>

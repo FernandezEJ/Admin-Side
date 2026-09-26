@@ -1,0 +1,341 @@
+/* global global, process */
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { createServer } from 'vite';
+import React from 'react';
+import { renderToString } from 'react-dom/server';
+import { MemoryRouter, Navigate, Outlet, createRoutesFromElements, matchRoutes } from 'react-router-dom';
+
+const server = await createServer({ server: { middlewareMode: true } });
+const storage = () => {
+  const values = new Map();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+  };
+};
+global.localStorage = storage();
+global.sessionStorage = storage();
+global.window = { localStorage, sessionStorage };
+
+try {
+  for (const path of ['src/pages/AdminManagement.jsx', 'src/pages/AuditLogs.jsx', 'src/pages/SystemReports.jsx', 'src/styles/system-reports.css']) {
+    assert.ok(existsSync(path), `${path} is in the active structure`);
+  }
+  for (const path of ['src/reserved', 'src/pages/Reports.jsx', 'src/pages/Reports.css', 'src/pages/Feedback.jsx', 'src/App.css']) {
+    assert.equal(existsSync(path), false, `${path} is removed`);
+  }
+  const reportCss = readFileSync('src/styles/system-reports.css', 'utf8');
+  assert.ok(reportCss.includes('min-width: 0') && reportCss.includes('table-header-group'));
+  const { EmptyState, ErrorState, PageSkeleton } = await server.ssrLoadModule('/src/components/ui/PageState.jsx');
+  assert.ok(renderToString(React.createElement(EmptyState)).includes('role="status"'));
+  assert.ok(renderToString(React.createElement(ErrorState)).includes('role="alert"'));
+  assert.ok(renderToString(React.createElement(PageSkeleton)).includes('Loading page'));
+  const { default: Provider } = await server.ssrLoadModule('/src/auth/AdminSessionProvider.jsx');
+  const { useAdminSession } = await server.ssrLoadModule('/src/auth/useAdminSession.js');
+  const { default: RequireRole } = await server.ssrLoadModule('/src/auth/RequireRole.jsx');
+  const { ADMIN_ROLES, hasRole } = await server.ssrLoadModule('/src/auth/roles.js');
+  const { SESSION_KEY, readMockSession } = await server.ssrLoadModule('/src/auth/mockSession.js');
+  const { AppRoutes } = await server.ssrLoadModule('/src/AppRoutes.jsx');
+  const { recoveryDates, clearRecoveryDates, monthKey, isRecoverable } = await server.ssrLoadModule('/src/data/recoveryPolicy.js');
+  const deletedAt = '2026-09-23T05:00:00Z';
+  assert.equal(recoveryDates(deletedAt).scheduled_for_deletion_at, '2026-10-23T05:00:00.000Z');
+  assert.equal(clearRecoveryDates().scheduled_for_deletion_at, null);
+  assert.equal(isRecoverable(recoveryDates(deletedAt), Date.parse('2026-10-22T05:00:00Z')), true);
+  assert.equal(isRecoverable(recoveryDates(deletedAt), Date.parse('2026-10-23T05:00:00Z')), false);
+  assert.equal(monthKey('2026-08-31T17:00:00Z'), '2026-09');
+  const { mockRedemptions, filterRedemptions } = await server.ssrLoadModule('/src/data/rewardRedemptions.js');
+  const { default: MonthFilter } = await server.ssrLoadModule('/src/components/ui/MonthFilter.jsx');
+  const monthDropdown = renderToString(React.createElement(MonthFilter, { value: '', onChange: () => {} }));
+  assert.equal((monthDropdown.match(/<option /g) ?? []).length, 13);
+  assert.ok(monthDropdown.includes('All Months') && monthDropdown.includes('January') && monthDropdown.includes('December'));
+  assert.ok(!monthDropdown.includes('type="month"') && !monthDropdown.includes('2026-09'));
+  assert.equal(filterRedemptions(mockRedemptions, 'active', '09').length, 1);
+  assert.equal(filterRedemptions(mockRedemptions, 'expired', '08').length, 1);
+  assert.equal(filterRedemptions(mockRedemptions, '', '01').length, 0);
+  for (const status of ['active', 'inactive', 'expired']) {
+    assert.equal(filterRedemptions(mockRedemptions, status).length, 1);
+  }
+  assert.equal(filterRedemptions(mockRedemptions, 'expired', '2026-09').length, 0);
+  assert.equal(filterRedemptions(mockRedemptions, 'expired', '2026-08').length, 1);
+  assert.equal(filterRedemptions(mockRedemptions, '', '2026-09').length, 2);
+  const { default: ReportChart } = await server.ssrLoadModule('/src/components/ReportChart.jsx');
+  const printChart = renderToString(React.createElement(ReportChart, null, React.createElement('svg', null, React.createElement('circle', { r: 30 }))));
+  assert.ok(printChart.includes('report-print-chart') && printChart.includes('width="640"') && printChart.includes('height="260"'));
+  const appSource = readFileSync('src/App.jsx', 'utf8');
+  assert.ok(appSource.includes('lazy(() => import') && appSource.includes('fallback={<PageSkeleton />'));
+  const { getRewardsAnalytics, mockRewardRedemptions, analyticsPeriods } = await server.ssrLoadModule('/src/data/rewardsAnalytics.js');
+  const { getRewardsAnalyticsForPeriod } = await server.ssrLoadModule('/src/data/rewardsAnalytics.js');
+  const inventory = [
+    { id: 1, status: 'active', stock: 20 }, { id: 2, status: 'active', stock: 12 },
+    { id: 3, status: 'inactive', stock: 7 }, { id: 4, status: 'deleted', stock: 10 },
+  ];
+  const originalRedemptions = JSON.stringify(mockRewardRedemptions);
+  const annual = getRewardsAnalyticsForPeriod(inventory, '2026');
+  assert.equal(annual.summary.total_redemptions, 58);
+  assert.equal(annual.summary.total_points_spent, 16800);
+  assert.equal(annual.summary.active_inventory, 32);
+  assert.deepEqual(annual.top_rewards.map((reward) => reward.redemptions), [30, 21, 7]);
+  assert.equal(getRewardsAnalyticsForPeriod(inventory, '2026', '09').summary.total_redemptions, 23);
+  assert.equal(getRewardsAnalyticsForPeriod(inventory, '2026', '01').summary.total_redemptions, 0);
+  assert.equal(getRewardsAnalyticsForPeriod(inventory, '2025').summary.total_redemptions, 0);
+  for (const { value } of analyticsPeriods) {
+    const analytics = getRewardsAnalytics(inventory, value);
+    assert.equal(analytics.summary.active_inventory, 32);
+    for (const rows of [analytics.monthly_redemptions, analytics.reward_breakdown, analytics.top_rewards]) {
+      assert.equal(rows.reduce((sum, row) => sum + row.redemptions, 0), analytics.summary.total_redemptions);
+    }
+    assert.equal(analytics.top_rewards.reduce((sum, row) => sum + row.points_spent, 0), analytics.summary.total_points_spent);
+    assert.equal(analytics.summary.most_redeemed_reward, analytics.top_rewards[0].reward_name);
+    assert.ok(analytics.top_rewards.every((row, index, rows) => index === 0 || rows[index - 1].redemptions >= row.redemptions));
+    if (value !== 'all') assert.deepEqual(analytics.monthly_redemptions.map((row) => row.period), [value]);
+  }
+  assert.equal(getRewardsAnalytics(inventory, '2026-09').summary.total_redemptions, 23);
+  assert.equal(getRewardsAnalytics(inventory, '2026-09').summary.total_points_spent, 6750);
+  assert.equal(getRewardsAnalytics(inventory, '2026-08').summary.total_points_spent, 5450);
+  assert.equal(getRewardsAnalytics(inventory).summary.total_redemptions, 58);
+  const deletedInventory = inventory.map((row) => row.id === 1 ? { ...row, status: 'deleted' } : row);
+  assert.equal(getRewardsAnalytics(deletedInventory).summary.active_inventory, 12);
+  assert.deepEqual(getRewardsAnalytics(deletedInventory).top_rewards, getRewardsAnalytics(inventory).top_rewards);
+  assert.equal(getRewardsAnalytics([], '2024-01').summary.most_redeemed_reward, null);
+  assert.equal(getRewardsAnalytics([], '2024-01').summary.total_redemptions, 0);
+  assert.equal(JSON.stringify(mockRewardRedemptions), originalRedemptions);
+  const { monthlyReports, generateMockReport, reportPeriodLabel } = await server.ssrLoadModule('/src/data/systemReports.js');
+  const generatedAt = '2026-09-23T05:00:00Z';
+  for (const [period, data] of Object.entries(monthlyReports)) {
+    const snapshot = generateMockReport(period, generatedAt);
+    assert.equal(snapshot.period, period);
+    assert.equal(snapshot.generated_at, generatedAt);
+    assert.equal(snapshot.data, data);
+    assert.equal(data.donor_summary.total, data.donor_summary.eligible + data.donor_summary.not_eligible);
+    assert.equal(data.blood_types.reduce((sum, item) => sum + item.value, 0), data.donor_summary.total);
+    assert.equal(data.weekly_donations.reduce((sum, item) => sum + item.donations, 0), data.donation_summary.completed);
+    const { total, completed, pending, rejected, needs_revision } = data.donation_summary;
+    assert.equal(total, completed + pending + rejected + needs_revision);
+    assert.ok(data.completed_donations.every((row) => row.date.startsWith(period)));
+    assert.ok(data.reward_redemptions.every((row) => row.date.startsWith(period)));
+    assert.ok(data.rewards_summary.points_issued > 0 && data.rewards_summary.most_redeemed_reward);
+  }
+  assert.notDeepEqual(generateMockReport('2026-08').data, generateMockReport('2026-09').data);
+  assert.notDeepEqual(generateMockReport('2025-09').data, generateMockReport('2026-09').data);
+  assert.equal(generateMockReport('2024-01').data, null);
+  assert.equal(reportPeriodLabel('2025-09'), 'September 2025');
+  const { mockAdmins, mockAuditLogs, saveAdmin, setAdminStatus, filterAdmins, filterAuditLogs } =
+    await server.ssrLoadModule('/src/data/adminManagement.js');
+  const { getDashboardOverview } = await server.ssrLoadModule('/src/data/dashboardOverview.js');
+  const overview = getDashboardOverview();
+  assert.equal(overview.total_admins, mockAdmins.length);
+  assert.equal(overview.active_admins, mockAdmins.filter((admin) => admin.status === 'active').length);
+  assert.deepEqual(overview.recent_admin_activity, [...mockAuditLogs]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3));
+  const dashboardRewards = getRewardsAnalytics([], overview.rewards_summary.period).summary;
+  assert.equal(overview.rewards_summary.total_redemptions, dashboardRewards.total_redemptions);
+  assert.equal(overview.rewards_summary.most_redeemed_reward, dashboardRewards.most_redeemed_reward);
+  const originalAdmins = JSON.stringify(mockAdmins);
+  const deactivated = setAdminStatus(mockAdmins, 1, 'inactive', deletedAt);
+  assert.equal(filterAdmins(deactivated, '', 'active').some((admin) => admin.id === 1), false);
+  assert.equal(filterAdmins(deactivated, '', 'inactive').find((admin) => admin.id === 1).scheduled_for_deletion_at, '2026-10-23T05:00:00.000Z');
+  assert.equal(setAdminStatus(deactivated, 1, 'active')[0].deactivated_at, null);
+  assert.equal(filterAuditLogs(mockAuditLogs, '', '', '2026-08').length, 0);
+  assert.equal(filterAuditLogs(mockAuditLogs, ' MARIA ', 'Verification', '2026-09').length, 2);
+  assert.equal(filterAuditLogs(mockAuditLogs, ' MARIA ', 'Verification', '09').length, 2);
+  assert.equal(filterAuditLogs(mockAuditLogs, '', '', '01').length, 0);
+  let editedAdmins = saveAdmin(mockAdmins, { name: ' Test Admin ', email: ' TEST@lifeflow.test ', role: 'super_admin' });
+  const addedAdmin = editedAdmins.at(-1);
+  assert.equal(addedAdmin.role, ADMIN_ROLES.ADMIN);
+  assert.equal(addedAdmin.name, 'Test Admin');
+  assert.equal(addedAdmin.email, 'test@lifeflow.test');
+  assert.equal(addedAdmin.status, 'active');
+  assert.ok(!Number.isNaN(Date.parse(addedAdmin.created_at)));
+  assert.throws(() => saveAdmin(editedAdmins, { name: 'Duplicate', email: 'TEST@lifeflow.test' }), /already exists/);
+  assert.throws(() => saveAdmin(editedAdmins, { name: ' ', email: 'bad' }), /valid email/);
+  editedAdmins = saveAdmin(editedAdmins, { name: 'Updated Admin', email: addedAdmin.email }, addedAdmin.id);
+  assert.equal(editedAdmins.at(-1).name, 'Updated Admin');
+  assert.equal(editedAdmins.at(-1).created_at, addedAdmin.created_at);
+  editedAdmins = setAdminStatus(editedAdmins, addedAdmin.id, 'inactive');
+  assert.equal(editedAdmins.at(-1).status, 'inactive');
+  editedAdmins = setAdminStatus(editedAdmins, addedAdmin.id, 'active');
+  assert.equal(editedAdmins.at(-1).status, 'active');
+  assert.equal(JSON.stringify(mockAdmins), originalAdmins);
+  assert.equal(filterAdmins(editedAdmins, '  UPDATED ').length, 1);
+  assert.equal(filterAdmins(editedAdmins, 'test@lifeflow.test').length, 1);
+  assert.equal(filterAdmins(editedAdmins, 'no-match').length, 0);
+  assert.equal(filterAuditLogs(mockAuditLogs, ' MARIA ', 'Verification').length, 2);
+  assert.equal(filterAuditLogs(mockAuditLogs, 'requested proof').length, 1);
+  assert.equal(filterAuditLogs(mockAuditLogs, '', 'Rewards').length, 1);
+  assert.equal(filterAuditLogs(mockAuditLogs, 'no-match').length, 0);
+  const routes = createRoutesFromElements(AppRoutes().props.children);
+  const normalPaths = ['/dashboard', '/announcements', '/verification', '/donors', '/rewards'];
+  const restrictedPages = [
+    ['/system-reports', 'System Reports'],
+    ['/admin-management', 'Admin Management'],
+    ['/audit-logs', 'Audit Logs'],
+  ];
+  function renderPath(path) {
+    return renderToString(React.createElement(MemoryRouter, { initialEntries: [path] },
+      React.createElement(Provider, null, React.createElement(AppRoutes))));
+  }
+  let session;
+  let guard;
+  function Probe({ allowedRoles }) {
+    session = useAdminSession();
+    guard = RequireRole({ allowedRoles });
+    return null;
+  }
+  function inspect(allowedRoles) {
+    renderToString(React.createElement(Provider, null, React.createElement(Probe, { allowedRoles })));
+  }
+
+  inspect();
+  assert.equal(session.isAuthenticated, false);
+  assert.equal(guard.type, Navigate);
+  assert.equal(guard.props.to, '/');
+  for (const path of [...normalPaths, ...restrictedPages.map(([path]) => path)]) {
+    assert.equal(renderPath(path), '', `Logged out: ${path} does not render`);
+  }
+  session.login();
+  assert.ok(sessionStorage.getItem(SESSION_KEY));
+  assert.equal(localStorage.getItem(SESSION_KEY), null);
+  inspect();
+  assert.equal(session.isAuthenticated, true);
+
+  for (const role of Object.values(ADMIN_ROLES)) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ id: 1, name: 'Sample Admin', email: 'admin@lifeflow.test', role }));
+    inspect();
+    assert.equal(session.role, role);
+    assert.equal(session.isAdmin, true);
+    assert.equal(session.isSuperAdmin, role === ADMIN_ROLES.SUPER_ADMIN);
+    assert.equal(guard.type, Outlet);
+    inspect([ADMIN_ROLES.SUPER_ADMIN]);
+    assert.equal(guard.type, role === ADMIN_ROLES.SUPER_ADMIN ? Outlet : Navigate);
+    if (guard.type === Navigate) assert.equal(guard.props.to, '/dashboard');
+
+    for (const path of normalPaths) {
+      const html = renderPath(path);
+      assert.ok(html.includes('Sample Admin'), `${role}: ${path} loads session profile`);
+      if (path === '/donors') {
+        assert.ok(!html.includes('/donors/'));
+        assert.ok(html.includes('Juan Dela Cruz') && html.includes('Achievement'));
+      }
+      if (path === '/dashboard') {
+        for (const label of ['Total Donors', 'Eligible', 'Temporarily Ineligible', 'Donation Activity', 'Blood Types', 'Recent Verification Requests']) {
+          assert.ok(html.includes(label), `${role} retains ${label}`);
+        }
+        for (const label of ['Super Admin Overview', 'Total Admins', 'Active Admins', 'Recent Admin Activity', 'Rewards Redeemed', 'View Audit Logs']) {
+          assert.equal(html.includes(label), role === ADMIN_ROLES.SUPER_ADMIN, `${role}: ${label} visibility`);
+        }
+        if (role === ADMIN_ROLES.SUPER_ADMIN) {
+          assert.ok(html.includes(overview.rewards_summary.period_label));
+          assert.ok(html.includes(overview.rewards_summary.most_redeemed_reward));
+          for (const log of overview.recent_admin_activity) {
+            assert.ok(html.includes(log.action_label) && html.includes(log.created_at));
+          }
+          assert.equal((html.match(/<time /g) ?? []).length, 3);
+          assert.ok(!html.includes(mockAuditLogs.at(-1).created_at), 'Dashboard shows a preview, not the full audit history');
+        }
+      }
+      if (path === '/rewards') {
+        assert.ok(html.includes('Reward Management') && html.includes('Add Grocery Voucher'));
+        assert.ok(html.includes('Delete reward') && html.includes('Search grocery vouchers'));
+        assert.ok(html.includes('aria-controls="rewards-analytics"'));
+        assert.ok(html.includes('Rewards Analytics') && html.includes('All Months'));
+        assert.ok(html.includes('Redemption Trend') && !html.includes('Voucher Amount Breakdown') && html.includes('Top 3 Most Redeemed Rewards'));
+        const analyticsHtml = html.slice(html.indexOf('aria-label="Rewards Analytics"')).replace(/<!-- -->/g, '');
+        assert.equal((analyticsHtml.match(/<dt /g) ?? []).length, 3);
+        assert.ok(analyticsHtml.indexOf('</dl>') < analyticsHtml.indexOf('<select'));
+        assert.ok(analyticsHtml.indexOf('Redemption Trend') < analyticsHtml.indexOf('Top 3 Most Redeemed Rewards'));
+        assert.ok(analyticsHtml.includes('30 redemptions') && analyticsHtml.includes('21 redemptions') && analyticsHtml.includes('7 redemptions'));
+        assert.ok(!analyticsHtml.includes('2026-09'));
+        const analyticsSource = readFileSync('src/components/rewards/RewardsAnalytics.jsx', 'utf8');
+        assert.equal((analyticsSource.match(/<BarChart /g) ?? []).length, 1);
+        assert.ok(!analyticsSource.includes('LineChart') && !analyticsSource.includes('<Line '));
+        assert.ok(!analyticsSource.includes('layout="vertical"'));
+        const dashboardSource = readFileSync('src/pages/Dashboard.jsx', 'utf8');
+        const dashboardChart = dashboardSource.match(/<BarChart data=\{donationActivity\}>[\s\S]*?<\/BarChart>/)[0];
+        const rewardsChart = analyticsSource.match(/<BarChart data=\{chartData\}>[\s\S]*?<\/BarChart>/)[0];
+        const normalizedRewards = rewardsChart.replace('data={chartData}', 'data={donationActivity}')
+          .replace('dataKey="label"', 'dataKey="month"')
+          .replace(/\s*tickFormatter=\{\(label\) => label.slice\(0, 3\)\}/, '')
+          .replace('dataKey="redemptions"', 'dataKey="donations"')
+          .replace(/\s*name="Redeemed"/, '');
+        assert.equal(normalizedRewards.replace(/\s+/g, ' '), dashboardChart.replace(/\s+/g, ' '));
+        assert.ok(analyticsSource.includes('top_rewards.slice(0, 3)'));
+        assert.ok(html.includes('Points Spent') && html.includes('Active Stock') && html.includes('16,800'));
+      }
+      const nav = html.match(/<nav\b[^>]*>([\s\S]*?)<\/nav>/)[1];
+      const paths = [...nav.matchAll(/href="([^"]+)"/g)].map((match) => match[1]);
+      assert.deepEqual(paths, role === ADMIN_ROLES.ADMIN ? normalPaths :
+        [...normalPaths, ...restrictedPages.map(([path]) => path)]);
+      assert.ok(html.includes('Logout'));
+      assert.ok(!nav.includes('Feedback'));
+      assert.ok(!paths.includes('/reports'));
+    }
+    for (const [path, label] of restrictedPages) {
+      const matches = matchRoutes(routes, path);
+      const roleGuard = matches.find(({ route }) => route.element?.props.allowedRoles);
+      assert.ok(roleGuard, `${path} is role-guarded`);
+      inspect(roleGuard.route.element.props.allowedRoles);
+      const html = renderPath(path);
+      if (role === ADMIN_ROLES.ADMIN) {
+        assert.equal(guard.type, Navigate);
+        assert.equal(guard.props.to, '/dashboard');
+        assert.equal(html, '', `Admin cannot render ${path}`);
+      } else {
+        assert.equal(guard.type, Outlet);
+        assert.match(html, new RegExp(`<h1[^>]*>${label}</h1>`));
+        if (path === '/system-reports') {
+          assert.ok(html.includes('Print / Save as PDF') && html.includes('September 2026'));
+          assert.ok(html.includes('Points Issued') && html.includes('Total Participations'));
+          assert.ok(html.includes('Generated on:') && html.includes('Most Redeemed Reward'));
+          const printable = html.slice(html.indexOf('id="monthly-report"'));
+          assert.ok(!printable.includes('<nav') && !printable.includes('<select'));
+          assert.ok(printable.includes('System Reports'));
+        }
+        if (path === '/audit-logs') {
+          assert.ok(!html.includes('type="month"'));
+          assert.ok(html.includes('All Months') && html.includes('September'));
+          assert.ok(html.indexOf('All modules') < html.indexOf('All Months'));
+          const table = html.match(/<table\b[\s\S]*?<\/table>/)[0];
+          assert.ok(!table.includes('<button'), 'Audit records have no mutation actions');
+          assert.ok(table.includes('Target / Details'));
+        }
+        if (path === '/admin-management') {
+          const content = html.slice(html.indexOf('<main'));
+          assert.ok(content.indexOf('Total Admins') < content.indexOf('Search Admins'));
+          assert.ok(content.indexOf('Create Admin') < content.indexOf('aria-label="Admin account status"'));
+          assert.ok(content.indexOf('aria-label="Admin account status"') < content.indexOf('<table'));
+          assert.ok(html.includes('Create Admin') && html.includes('Reset Password'));
+          assert.ok(html.includes('Deactivated Admins') && html.includes('Deactivate'));
+        }
+      }
+    }
+    const legacyMatches = matchRoutes(routes, '/reports');
+    inspect(legacyMatches.find(({ route }) => route.element?.props.allowedRoles).route.element.props.allowedRoles);
+    assert.equal(guard.type, role === ADMIN_ROLES.ADMIN ? Navigate : Outlet);
+    assert.equal(legacyMatches.at(-1).route.element.props.to, '/system-reports');
+    const feedbackMatch = matchRoutes(routes, '/feedback').at(-1).route;
+    assert.equal(feedbackMatch.path, '*');
+    assert.equal(feedbackMatch.element.props.to, '/dashboard');
+    assert.equal(renderPath('/feedback'), '');
+  }
+
+  session.logout();
+  assert.equal(localStorage.getItem(SESSION_KEY), null);
+  assert.equal(sessionStorage.getItem(SESSION_KEY), null);
+  inspect();
+  assert.equal(guard.props.to, '/');
+  session.login({ remember: true });
+  assert.ok(localStorage.getItem(SESSION_KEY));
+  assert.equal(sessionStorage.getItem(SESSION_KEY), null);
+  session.logout();
+  for (const value of ['invalid json', '{}', '{"id":1,"name":"Test","email":"test@example.com","role":"unknown"}']) {
+    localStorage.setItem(SESSION_KEY, value);
+    assert.equal(readMockSession(), null);
+  }
+  assert.equal(hasRole('unknown'), false);
+  assert.equal(hasRole(ADMIN_ROLES.ADMIN, []), false);
+  process.stdout.write('Auth/navigation checks passed: both sidebars, protected routes, restricted pages, legacy URLs, persistence, logout, invalid sessions.\n');
+} finally {
+  await server.close();
+}

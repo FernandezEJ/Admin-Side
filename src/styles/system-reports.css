@@ -1,0 +1,134 @@
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html,
+  body {
+    background: white;
+  }
+
+  body {
+    margin: 0;
+  }
+
+  #monthly-report {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    box-shadow: none;
+  }
+
+  #monthly-report section,
+  #monthly-report article {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  svg {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  table {
+    break-inside: auto;
+  }
+
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+/* Extend the existing A4 rules without changing other pages. */
+@media print {
+  .system-reports-page {
+    display: block;
+    min-height: 0;
+    background: white;
+  }
+
+  .system-reports-page .print\:hidden {
+    display: none !important;
+  }
+
+  #monthly-report {
+    font-size: 10pt;
+    color: #111827;
+  }
+
+  #monthly-report section {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  #monthly-report .report-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5mm;
+  }
+
+  #monthly-report .report-charts {
+    display: block;
+  }
+
+  #monthly-report article {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 5mm;
+  }
+
+  #monthly-report h3 {
+    break-after: avoid;
+  }
+
+  #monthly-report .overflow-hidden {
+    overflow: visible;
+  }
+
+  #monthly-report table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  #monthly-report thead {
+    display: table-header-group;
+  }
+
+  #monthly-report th,
+  #monthly-report td {
+    overflow-wrap: anywhere;
+    padding: 2mm;
+    font-size: 9pt;
+  }
+
+  #monthly-report .recharts-wrapper,
+  #monthly-report .recharts-surface {
+    max-width: 100%;
+  }
+
+  #monthly-report .overflow-x-auto {
+    overflow: visible;
+  }
+
+  #monthly-report .recharts-surface {
+    height: auto;
+  }
+
+  #monthly-report .text-gray-400 {
+    color: #4b5563;
+  }
+}
+.report-print-chart { display: none; }
+@media print {
+  #monthly-report .report-screen-chart { display: none !important; }
+  #monthly-report .report-print-chart { display: block !important; width: 640px; max-width: 100%; height: 260px; }
+  #monthly-report .report-print-chart .recharts-wrapper { width: 640px !important; height: 260px !important; max-width: 100%; }
+  #monthly-report .report-print-chart svg { display: block; width: 100%; height: 260px; overflow: visible; }
+  #monthly-report .report-charts .lg\:w-\[60\%\] { width: 100%; }
+}

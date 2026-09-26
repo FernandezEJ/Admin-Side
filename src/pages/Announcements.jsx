@@ -1,3 +1,5 @@
+import { recoveryDates, clearRecoveryDates, isRecoverable } from '../data/recoveryPolicy';
+import { EmptyState } from '../components/ui/PageState';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -6,7 +8,7 @@ import {
   Search,
   Megaphone,
   CalendarClock,
-  Archive,
+
   Trash2,
   Eye,
   Pencil,
@@ -90,6 +92,7 @@ function Announcements() {
       publishedDate: '2026-06-01',
       expiresDate: '2026-06-18',
       status: 'deleted',
+              ...recoveryDates('2026-09-20T08:00:00Z'),
     },
   ]);
 
@@ -184,7 +187,7 @@ function Announcements() {
 
   const handleDelete = (id) => {
     const confirmed = window.confirm(
-      'Move this announcement to Deleted? You can restore it later.'
+      'Move this announcement to Deleted? Recoverable for 30 days; permanent purge is handled later by the backend.'
     );
 
     if (!confirmed) return;
@@ -195,6 +198,7 @@ function Announcements() {
           ? {
               ...announcement,
               status: 'deleted',
+              ...recoveryDates(),
             }
           : announcement
       )
@@ -207,6 +211,7 @@ function Announcements() {
   // ============================================================
 
   const handleRestore = (id) => {
+    if (!isRecoverable(announcements.find((item) => item.id === id) ?? {})) return;
     const confirmed = window.confirm(
       'Restore this announcement to Drafts?'
     );
@@ -218,6 +223,7 @@ function Announcements() {
         announcement.id === id
           ? {
               ...announcement,
+              ...clearRecoveryDates(),
               status: 'draft',
               publishedDate: null,
             }
@@ -238,7 +244,7 @@ function Announcements() {
           description="Create and manage LifeFlow donation announcements."
         />
 
-        <div className="space-y-6 p-8">
+        <div className="space-y-6 p-4 lg:p-8">
           {/* Page heading */}
           <section className="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -341,7 +347,7 @@ function Announcements() {
 
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">
-              <div className="relative min-w-64 flex-1">
+              <div className="relative min-w-0 w-full sm:min-w-64 flex-1">
                 <Search
                   size={17}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -439,6 +445,7 @@ function Announcements() {
                       <td className="px-6 py-5">
                         <p className="font-semibold text-gray-800">
                           {announcement.title}
+                            {announcement.status === 'deleted' && <p className="mt-2 text-xs text-gray-500">Recoverable for 30 days. Deletion scheduled: {announcement.scheduled_for_deletion_at?.slice(0, 10)}. No automatic purge in preview.</p>}
                         </p>
 
                         <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
@@ -468,7 +475,7 @@ function Announcements() {
                               ? 'bg-blue-50 text-blue-700'
                               : announcement.status === 'expired'
                               ? 'bg-gray-100 text-gray-600'
-                              : 'bg-red-50 text-red-700'
+                              : 'text-red-700'
                           }`}
                         >
                           {announcement.status === 'active'
@@ -527,7 +534,7 @@ function Announcements() {
                           {announcement.status === 'deleted' && (
                             <button
                               type="button"
-                              title="Restore to Drafts"
+                              disabled={!isRecoverable(announcement)} title={isRecoverable(announcement) ? 'Restore' : 'Recovery period ended; awaiting backend purge'}
                               onClick={() =>
                                 handleRestore(announcement.id)
                               }
@@ -544,17 +551,7 @@ function Announcements() {
               </table>
 
               {filteredAnnouncements.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Archive size={34} className="text-gray-300" />
-
-                  <h3 className="mt-4 font-semibold text-gray-700">
-                    No announcements found
-                  </h3>
-
-                  <p className="mt-1 text-sm text-gray-400">
-                    Try changing your search or filters.
-                  </p>
-                </div>
+                <EmptyState title="No announcements found" />
               )}
             </div>
           </section>

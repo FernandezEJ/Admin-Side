@@ -20,8 +20,11 @@ import {
 
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
+import { useAdminSession } from '../auth/useAdminSession';
+import SuperAdminOverview from '../components/SuperAdminOverview';
 
 function Dashboard() {
+  const { isSuperAdmin } = useAdminSession();
   // ============================================================
   // Temporary Dashboard Data
   // Laravel will provide these values later.
@@ -117,7 +120,7 @@ function Dashboard() {
         {/* Sticky top header */}
         <Header />
 
-        <div className="space-y-6 p-8">
+        <div className="space-y-6 p-4 lg:p-8">
           {/* ==================================================
               Summary Cards
               ================================================== */}
@@ -382,7 +385,7 @@ function Dashboard() {
                       </td>
 
                       <td className="px-3 py-4">
-                        <span className="inline-flex rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+                        <span className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-[#b7192e]">
                           For Verification
                         </span>
                       </td>
@@ -390,7 +393,7 @@ function Dashboard() {
                       <td className="px-3 py-4">
                         <button
                           type="button"
-                          className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-[#b7192e] transition hover:bg-red-50"
+                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-[#b7192e] transition hover:bg-red-50"
                         >
                           View
                         </button>
@@ -401,6 +404,7 @@ function Dashboard() {
               </table>
             </div>
           </section>
+          {isSuperAdmin && <SuperAdminOverview />}
         </div>
       </main>
     </div>

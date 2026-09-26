@@ -78,7 +78,7 @@ function CreateAnnouncement() {
           description="Create a new blood donation announcement for LifeFlow donors."
         />
 
-        <div className="p-8">
+        <div className="p-4 lg:p-8">
           <div className="mx-auto max-w-5xl">
             <button
               type="button"

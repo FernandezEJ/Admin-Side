@@ -1,5 +1,6 @@
+import { EmptyState } from '../components/ui/PageState';
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 
 import {
   Search,
@@ -7,14 +8,16 @@ import {
   CircleCheck,
   Clock3,
   Trophy,
-  Eye,
+
 } from 'lucide-react';
 
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 
+import { donors } from '../data/donors';
+
 function Donors() {
-  const navigate = useNavigate();
+
 
   // ============================================================
   // Page State
@@ -48,80 +51,7 @@ function Donors() {
   // Laravel will provide these records later.
   // ============================================================
 
-  const donors = [
-    {
-      id: 1,
-      name: 'Juan Dela Cruz',
-      bloodType: 'O+',
-      eligibility: 'eligible',
-      totalDonations: 12,
-      achievement: 'Silver Donor',
-      joinedDate: '2026-01-12',
-    },
-    {
-      id: 2,
-      name: 'Maria Santos',
-      bloodType: 'A+',
-      eligibility: 'eligible',
-      totalDonations: 10,
-      achievement: 'Silver Donor',
-      joinedDate: '2026-02-04',
-    },
-    {
-      id: 3,
-      name: 'Carlo Reyes',
-      bloodType: 'B+',
-      eligibility: 'temporarily_ineligible',
-      totalDonations: 8,
-      achievement: 'Silver Donor',
-      joinedDate: '2026-03-18',
-    },
-    {
-      id: 4,
-      name: 'Angela Cruz',
-      bloodType: 'AB+',
-      eligibility: 'eligible',
-      totalDonations: 7,
-      achievement: 'Silver Donor',
-      joinedDate: '2026-04-09',
-    },
-    {
-      id: 5,
-      name: 'Mark Villanueva',
-      bloodType: 'O−',
-      eligibility: 'temporarily_ineligible',
-      totalDonations: 5,
-      achievement: 'Silver Donor',
-      joinedDate: '2026-05-22',
-    },
-    {
-      id: 6,
-      name: 'Paolo Garcia',
-      bloodType: 'A−',
-      eligibility: 'eligible',
-      totalDonations: 3,
-      achievement: 'Silver Donor',
-      joinedDate: '2026-06-14',
-    },
-    {
-      id: 7,
-      name: 'Sarah Mendoza',
-      bloodType: 'B−',
-      eligibility: 'eligible',
-      totalDonations: 2,
-      achievement: 'Silver Donor',
-      joinedDate: '2026-07-03',
-    },
-    {
-      id: 8,
-      name: 'Nicole Ramos',
-      bloodType: 'AB−',
-      eligibility: 'eligible',
-      totalDonations: 1,
-      achievement: 'Silver Donor',
-      joinedDate: '2026-08-11',
-    },
-  ];
+
 
   // ============================================================
   // Helpers
@@ -212,7 +142,7 @@ function Donors() {
     }
 
     return (
-      <span className="inline-flex rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+      <span className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-[#b7192e]">
         Temporarily Ineligible
       </span>
     );
@@ -228,7 +158,7 @@ function Donors() {
           description="Search donors, review profiles, and view top contributors."
         />
 
-        <div className="space-y-6 p-8">
+        <div className="space-y-6 p-4 lg:p-8">
           {/* ==================================================
               Page Heading
               ================================================== */}
@@ -342,7 +272,7 @@ function Donors() {
               <>
                 {/* Search + Filters */}
                 <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">
-                  <div className="relative min-w-64 flex-1">
+                  <div className="relative min-w-0 w-full sm:min-w-64 flex-1">
                     <Search
                       size={17}
                       className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -409,9 +339,9 @@ function Donors() {
                   </button>
                 </div>
 
-                {/* No horizontal scrolling */}
-                <div className="w-full overflow-hidden">
-                  <table className="w-full table-fixed text-left">
+                {/* Keep wide tables inside their scrolling container. */}
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full min-w-[640px] table-fixed text-left">
                     <thead>
                       <tr className="border-b border-gray-100">
                         <th className="w-[25%] px-5 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -434,9 +364,7 @@ function Donors() {
                         Achievement
                         </th>
 
-                        <th className="w-[14%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                          Actions
-                        </th>
+
                       </tr>
                     </thead>
 
@@ -457,7 +385,7 @@ function Donors() {
                           </td>
 
                           <td className="px-3 py-5">
-                            <span className="inline-flex min-w-10 justify-center rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-[#b7192e]">
+                            <span className="inline-flex min-w-10 justify-center rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#b7192e]">
                               {donor.bloodType}
                             </span>
                           </td>
@@ -481,41 +409,13 @@ function Donors() {
                                 {donor.achievement}
                             </span>
                             </td>
-
-                          <td className="px-3 py-5">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                navigate(
-                                  `/donors/${donor.id}`
-                                )
-                              }
-                              className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 transition hover:border-red-100 hover:bg-red-50 hover:text-[#b7192e]"
-                            >
-                              <Eye size={15} />
-                              View
-                            </button>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
 
                   {filteredDonors.length === 0 && (
-                    <div className="py-16 text-center">
-                      <Users
-                        size={36}
-                        className="mx-auto text-gray-300"
-                      />
-
-                      <h3 className="mt-4 font-semibold text-gray-700">
-                        No donors found
-                      </h3>
-
-                      <p className="mt-1 text-sm text-gray-400">
-                        Try changing your search or filters.
-                      </p>
-                    </div>
+                    <EmptyState title="No donors found" />
                   )}
                 </div>
               </>
@@ -540,7 +440,7 @@ function Donors() {
                   {topDonors.map((donor, index) => (
                     <div
                       key={donor.id}
-                      className="grid grid-cols-[60px_1fr_auto_auto] items-center gap-4 rounded-xl border border-gray-200 px-5 py-4"
+                      className="grid grid-cols-[40px_minmax(0,1fr)] sm:grid-cols-[60px_1fr_auto] items-center gap-4 rounded-xl border border-gray-200 px-5 py-4"
                     >
                       {/* Rank */}
                       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-sm font-bold text-gray-700">
@@ -581,17 +481,7 @@ function Donors() {
                         </p>
                       </div>
 
-                      {/* View */}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigate(`/donors/${donor.id}`)
-                        }
-                        className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-[#b7192e]"
-                        title="View donor"
-                      >
-                        <Eye size={17} />
-                      </button>
+
                     </div>
                   ))}
                 </div>

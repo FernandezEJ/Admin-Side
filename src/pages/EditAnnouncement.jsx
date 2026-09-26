@@ -51,7 +51,7 @@ function EditAnnouncement() {
           description="Modify announcement information."
         />
 
-        <div className="p-8">
+        <div className="p-4 lg:p-8">
           <div className="mx-auto max-w-5xl">
             <button
               type="button"

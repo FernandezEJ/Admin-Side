@@ -1,3 +1,4 @@
+import { EmptyState } from '../components/ui/PageState';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,12 +8,14 @@ import {
   CircleCheck,
   CircleX,
   Eye,
-  FileText,
+
   RotateCcw,
 } from 'lucide-react';
 
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
+
+import { verificationRequests } from '../data/verification';
 
 function Verification() {
   const navigate = useNavigate();
@@ -38,62 +41,7 @@ function Verification() {
   // - rejected
   // ============================================================
 
-  const verificationRequests = [
-    {
-      id: 1,
-      donor: 'Juan Dela Cruz',
-      bloodType: 'O+',
-      event: 'Community Blood Donation Drive',
-      submittedDate: '2026-09-16',
-      proofType: 'PDF',
-      status: 'for_verification',
-    },
-    {
-      id: 2,
-      donor: 'Maria Santos',
-      bloodType: 'A+',
-      event: 'LifeFlow University Blood Drive',
-      submittedDate: '2026-09-16',
-      proofType: 'JPG',
-      status: 'for_verification',
-    },
-    {
-      id: 3,
-      donor: 'Carlo Reyes',
-      bloodType: 'B+',
-      event: 'Community Blood Donation Drive',
-      submittedDate: '2026-09-15',
-      proofType: 'PNG',
-      status: 'needs_revision',
-    },
-    {
-      id: 4,
-      donor: 'Angela Cruz',
-      bloodType: 'AB+',
-      event: 'Barangay Donation Campaign',
-      submittedDate: '2026-08-22',
-      proofType: 'PDF',
-      status: 'completed',
-    },
-    {
-      id: 5,
-      donor: 'Mark Villanueva',
-      bloodType: 'O−',
-      event: 'Barangay Donation Campaign',
-      submittedDate: '2026-08-21',
-      proofType: 'JPG',
-      status: 'completed',
-    },
-    {
-      id: 6,
-      donor: 'Paolo Garcia',
-      bloodType: 'A−',
-      event: 'Emergency Blood Donation Event',
-      submittedDate: '2026-07-12',
-      proofType: 'PDF',
-      status: 'rejected',
-    },
-  ];
+
 
   // ============================================================
   // Date Helpers
@@ -187,7 +135,7 @@ function Verification() {
   const renderStatus = (status) => {
     if (status === 'for_verification') {
       return (
-        <span className="inline-flex rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+        <span className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-[#b7192e]">
           For Verification
         </span>
       );
@@ -210,7 +158,7 @@ function Verification() {
     }
 
     return (
-      <span className="inline-flex rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
+      <span className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-red-700">
         Rejected
       </span>
     );
@@ -226,7 +174,7 @@ function Verification() {
           description="Review donor proof submissions and verification history."
         />
 
-        <div className="space-y-6 p-8">
+        <div className="space-y-6 p-4 lg:p-8">
           {/* ==================================================
               Page Heading
               ================================================== */}
@@ -355,7 +303,7 @@ function Verification() {
                 Search + Filters
                 ================================================== */}
             <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">
-              <div className="relative min-w-64 flex-1">
+              <div className="relative min-w-0 w-full sm:min-w-64 flex-1">
                 <Search
                   size={17}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -416,8 +364,8 @@ function Verification() {
             {/* ==================================================
                 Verification Table
                 ================================================== */}
-            <div className="w-full overflow-hidden">
-              <table className="w-full table-fixed text-left">
+            <div className="w-full overflow-x-auto">
+              <table className="w-full min-w-[640px] table-fixed text-left">
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="w-[22%] px-4 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -459,7 +407,7 @@ function Verification() {
                       </td>
 
                       <td className="px-4 py-5">
-                        <span className="inline-flex min-w-10 justify-center rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-[#b7192e]">
+                        <span className="inline-flex min-w-10 justify-center rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#b7192e]">
                           {request.bloodType}
                         </span>
                       </td>
@@ -499,20 +447,7 @@ function Verification() {
 
               {/* Empty State */}
               {filteredRequests.length === 0 && (
-                <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                  <FileText
-                    size={36}
-                    className="text-gray-300"
-                  />
-
-                  <h3 className="mt-4 font-semibold text-gray-700">
-                    No verification records found
-                  </h3>
-
-                  <p className="mt-1 text-sm text-gray-400">
-                    Try changing your search or filters.
-                  </p>
-                </div>
+                <EmptyState title="No verification records found" />
               )}
             </div>
           </section>

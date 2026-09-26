@@ -83,7 +83,7 @@ function AddReward() {
           description="Create a new grocery voucher reward for LifeFlow donors."
         />
 
-        <div className="p-8">
+        <div className="p-4 lg:p-8">
           <div className="mx-auto max-w-4xl">
             <button
               type="button"
