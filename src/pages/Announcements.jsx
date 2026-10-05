@@ -1,6 +1,8 @@
-import { recoveryDates, clearRecoveryDates, isRecoverable } from '../data/recoveryPolicy';
-import { EmptyState } from '../components/ui/PageState';
-import { useMemo, useState } from 'react';
+import { filterAnnouncements } from '../services/announcementsApi';
+import { useAnnouncements } from '../services/useAnnouncements';
+import { isRecoverable } from '../data/recoveryPolicy';
+import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -15,12 +17,20 @@ import {
   MapPin,
   RotateCcw,
   FileText,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 
 function Announcements() {
+  const remote = useAnnouncements();
+  return <AnnouncementsView remote={remote} />;
+}
+
+export function AnnouncementsView({ remote }) {
   const navigate = useNavigate();
 
   // ============================================================
@@ -31,74 +41,9 @@ function Announcements() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
+  const currentYear = Number(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila', year: 'numeric' }));
 
-  // ============================================================
-  // Temporary Announcement Data
-  // Laravel will provide this later.
-  // ============================================================
-
-  const [announcements, setAnnouncements] = useState([
-    {
-      id: 1,
-      title: 'Community Blood Donation Drive',
-      location: 'City Health Office',
-      description:
-        'Join the upcoming community blood donation activity.',
-      donationDate: '2026-09-28',
-      publishedDate: '2026-09-16',
-      expiresDate: '2026-09-28',
-      status: 'active',
-    },
-    {
-      id: 2,
-      title: 'LifeFlow University Blood Drive',
-      location: 'University Activity Center',
-      description:
-        'A university-wide blood donation event for eligible donors.',
-      donationDate: '2026-10-05',
-      publishedDate: '2026-09-15',
-      expiresDate: '2026-10-05',
-      status: 'active',
-    },
-    {
-      id: 3,
-      title: 'Upcoming Donation Draft',
-      location: 'Municipal Gymnasium',
-      description:
-        'This announcement is still being prepared.',
-      donationDate: '2026-10-18',
-      publishedDate: null,
-      expiresDate: '2026-10-18',
-      status: 'draft',
-    },
-    {
-      id: 4,
-      title: 'Barangay Donation Campaign',
-      location: 'Barangay Covered Court',
-      description:
-        'Previous barangay blood donation campaign.',
-      donationDate: '2026-08-22',
-      publishedDate: '2026-08-10',
-      expiresDate: '2026-08-22',
-      status: 'expired',
-    },
-    {
-      id: 5,
-      title: 'Sample Removed Announcement',
-      location: 'Community Center',
-      description:
-        'This announcement was soft deleted.',
-      donationDate: '2026-06-18',
-      publishedDate: '2026-06-01',
-      expiresDate: '2026-06-18',
-      status: 'deleted',
-              ...recoveryDates('2026-09-20T08:00:00Z'),
-    },
-  ]);
-
-  // ============================================================
-  // Helpers
-  // ============================================================
+  const { items: announcements, loading, error, busy, model } = remote;
 
   const months = [
     ['01', 'January'],
@@ -115,17 +60,9 @@ function Announcements() {
     ['12', 'December'],
   ];
 
-  const availableYears = useMemo(() => {
-    const years = announcements.map((announcement) =>
-      announcement.donationDate.substring(0, 4)
-    );
-
-    return [...new Set(years)].sort((a, b) => b - a);
-  }, [announcements]);
-
   const formatDate = (dateString) => {
     if (!dateString) {
-      return 'Not published';
+      return '-';
     }
 
     const date = new Date(`${dateString}T00:00:00`);
@@ -146,33 +83,7 @@ function Announcements() {
   // Search + Filter
   // ============================================================
 
-  const filteredAnnouncements = announcements.filter((announcement) => {
-    const matchesTab = announcement.status === activeTab;
-
-    const matchesSearch =
-      announcement.title
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      announcement.location
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-
-    const month = announcement.donationDate.substring(5, 7);
-    const year = announcement.donationDate.substring(0, 4);
-
-    const matchesMonth =
-      selectedMonth === 'all' || month === selectedMonth;
-
-    const matchesYear =
-      selectedYear === 'all' || year === selectedYear;
-
-    return (
-      matchesTab &&
-      matchesSearch &&
-      matchesMonth &&
-      matchesYear
-    );
-  });
+  const filteredAnnouncements = filterAnnouncements(announcements, activeTab, searchTerm, selectedMonth, selectedYear);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -186,52 +97,10 @@ function Announcements() {
   // ============================================================
 
   const handleDelete = (id) => {
-    const confirmed = window.confirm(
-      'Move this announcement to Deleted? Recoverable for 30 days; permanent purge is handled later by the backend.'
-    );
-
-    if (!confirmed) return;
-
-    setAnnouncements((current) =>
-      current.map((announcement) =>
-        announcement.id === id
-          ? {
-              ...announcement,
-              status: 'deleted',
-              ...recoveryDates(),
-            }
-          : announcement
-      )
-    );
+    if (!busy && window.confirm('Move this announcement to Deleted? Recovery is available for 30 days.')) model.action(id, 'delete');
   };
-
-  // ============================================================
-  // Restore
-  // Restored announcements ALWAYS return to Drafts.
-  // ============================================================
-
   const handleRestore = (id) => {
-    if (!isRecoverable(announcements.find((item) => item.id === id) ?? {})) return;
-    const confirmed = window.confirm(
-      'Restore this announcement to Drafts?'
-    );
-
-    if (!confirmed) return;
-
-    setAnnouncements((current) =>
-      current.map((announcement) =>
-        announcement.id === id
-          ? {
-              ...announcement,
-              ...clearRecoveryDates(),
-              status: 'draft',
-              publishedDate: null,
-            }
-          : announcement
-      )
-    );
-
-    setActiveTab('draft');
+    if (!busy && isRecoverable(announcements.find((item) => item.id === id) ?? {}) && window.confirm('Restore this announcement to Drafts?')) model.action(id, 'restore');
   };
 
   return (
@@ -268,7 +137,7 @@ function Announcements() {
           </section>
 
           {/* Summary cards */}
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section aria-label="Announcement status" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
               {
                 label: 'Active',
@@ -294,26 +163,37 @@ function Announcements() {
               const Icon = item.icon;
 
               return (
-                <article
+                <button
                   key={item.status}
-                  className="rounded-2xl border border-gray-200 bg-white p-5"
+                  type="button"
+                  onClick={() => setActiveTab(item.status)}
+                  aria-label={`Show ${item.label} announcements`}
+                  aria-pressed={activeTab === item.status}
+                  className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-red-200 hover:bg-red-50/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] ${
+                    activeTab === item.status
+                      ? 'border-red-200 bg-red-50/30'
+                      : 'border-gray-200 bg-white'
+                  }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-gray-500">
                         {item.label}
-                      </p>
+                      </span>
 
-                      <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                        {getCount(item.status)}
-                      </h3>
-                    </div>
+                      <span className="mt-2 block text-2xl font-bold text-gray-900">
+                        {loading ? '-'  : getCount(item.status)}
+                      </span>
+                    </span>
 
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-[#b7192e]">
-                      <Icon size={21} />
-                    </div>
-                  </div>
-                </article>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-[#b7192e]">
+                        <Icon size={21} aria-hidden="true" />
+                      </span>
+                      <ArrowRight size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
+                    </span>
+                  </span>
+                </button>
               );
             })}
           </section>
@@ -380,21 +260,20 @@ function Announcements() {
                 ))}
               </select>
 
-              <select
-                value={selectedYear}
-                onChange={(event) =>
-                  setSelectedYear(event.target.value)
-                }
-                className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600"
-              >
-                <option value="all">All Years</option>
-
-                {availableYears.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
+              <div role="group" aria-label="Announcement year" className="flex h-11 shrink-0 items-center rounded-xl border border-gray-200 bg-white">
+                <button type="button" aria-label="Previous year" onClick={() => setSelectedYear((year) => String((year === 'all' ? currentYear : Number(year)) - 1))}
+                  className="flex h-full w-11 items-center justify-center rounded-l-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
+                  <ChevronDown size={18} aria-hidden="true" />
+                </button>
+                <button type="button" aria-label="All years" aria-pressed={selectedYear === 'all'} title="All Years" onClick={() => setSelectedYear('all')}
+                  className="h-full w-24 text-center text-sm font-semibold tabular-nums text-gray-700 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
+                  {selectedYear === 'all' ? 'All Years' : selectedYear}
+                </button>
+                <button type="button" aria-label="Next year" onClick={() => setSelectedYear((year) => String((year === 'all' ? currentYear : Number(year)) + 1))}
+                  className="flex h-full w-11 items-center justify-center rounded-r-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
+                  <ChevronUp size={18} aria-hidden="true" />
+                </button>
+              </div>
 
               <button
                 type="button"
@@ -405,6 +284,8 @@ function Announcements() {
               </button>
             </div>
 
+            {loading && <PageSkeleton />}
+            {error && <ErrorState description={error} onRetry={model.load} />}
             {/* Table */}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[950px] text-left">
@@ -437,16 +318,16 @@ function Announcements() {
                 </thead>
 
                 <tbody>
-                  {filteredAnnouncements.map((announcement) => (
+                  {!loading && filteredAnnouncements.map((announcement) => (
                     <tr
                       key={announcement.id}
                       className="border-b border-gray-100 last:border-0"
                     >
                       <td className="px-6 py-5">
-                        <p className="font-semibold text-gray-800">
+                        <div className="font-semibold text-gray-800">
                           {announcement.title}
-                            {announcement.status === 'deleted' && <p className="mt-2 text-xs text-gray-500">Recoverable for 30 days. Deletion scheduled: {announcement.scheduled_for_deletion_at?.slice(0, 10)}. No automatic purge in preview.</p>}
-                        </p>
+                            {announcement.status === 'deleted' && <p className="mt-2 text-xs text-gray-500">Recoverable for 30 days. Deletion scheduled: {announcement.scheduled_for_deletion_at?.slice(0, 10)}. Announcements with participation history are retained.</p>}
+                        </div>
 
                         <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
                           <MapPin size={13} />
@@ -520,6 +401,7 @@ function Announcements() {
 
                               <button
                                 type="button"
+                                disabled={busy}
                                 title="Delete announcement"
                                 onClick={() =>
                                   handleDelete(announcement.id)
@@ -534,7 +416,7 @@ function Announcements() {
                           {announcement.status === 'deleted' && (
                             <button
                               type="button"
-                              disabled={!isRecoverable(announcement)} title={isRecoverable(announcement) ? 'Restore' : 'Recovery period ended; awaiting backend purge'}
+                              disabled={busy || !isRecoverable(announcement)} title={isRecoverable(announcement) ? 'Restore' : 'Recovery period ended; awaiting backend purge'}
                               onClick={() =>
                                 handleRestore(announcement.id)
                               }
@@ -550,7 +432,7 @@ function Announcements() {
                 </tbody>
               </table>
 
-              {filteredAnnouncements.length === 0 && (
+              {!loading && !error && filteredAnnouncements.length === 0 && (
                 <EmptyState title="No announcements found" />
               )}
             </div>

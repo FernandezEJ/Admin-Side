@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useRewards } from '../services/useRewards';
+import { REWARD_CATEGORIES } from '../services/rewardsApi';
+import { ErrorState, PageSkeleton } from '../components/ui/PageState';
 
 import {
   ArrowLeft,
@@ -10,31 +13,21 @@ import {
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 
-function AddReward() {
+export function RewardForm({ remote }) {
+  const { item, model, busy, error } = remote;
   const navigate = useNavigate();
-
-  const voucherValues = [
-    100,
-    200,
-    300,
-    400,
-    500,
-    600,
-    700,
-    800,
-    900,
-    1000,
-  ];
 
   // ============================================================
   // Form State
   // ============================================================
 
   const [formData, setFormData] = useState({
-    voucherValue: '100',
-    pointsRequired: '',
-    stock: '',
-    status: 'inactive',
+    name: item?.name ?? '',
+    category: item?.category ?? 'grocery',
+    voucherValue: item?.voucherValue == null ? '' : String(item.voucherValue),
+    pointsRequired: String(item?.pointsRequired ?? ''),
+    stock: String(item?.stock ?? ''),
+    status: item?.status ?? 'inactive',
   });
 
   const [image, setImage] = useState(null);
@@ -56,21 +49,11 @@ function AddReward() {
     }
   };
 
-  // ============================================================
-  // Submit
-  // Later this becomes POST /api/admin/rewards
-  // ============================================================
-
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-
-    console.log({
-      ...formData,
-      voucherValue: Number(formData.voucherValue),
-      pointsRequired: Number(formData.pointsRequired),
-      stock: Number(formData.stock),
-      image,
-    });
+    if (await model.save({ name: formData.name, category: formData.category,
+      voucher_value: formData.voucherValue, points_cost: formData.pointsRequired, stock_quantity: formData.stock,
+      status: formData.status, ...(item ? { expected_stock: item.stock } : {}), image })) navigate('/rewards');
   };
 
   return (
@@ -79,8 +62,8 @@ function AddReward() {
 
       <main className="min-w-0 flex-1">
         <Header
-          title="Add Grocery Voucher"
-          description="Create a new grocery voucher reward for LifeFlow donors."
+          title={item ? 'Edit Voucher' : 'Add Voucher'}
+          description="Manage a LifeFlow voucher reward for donors."
         />
 
         <div className="p-4 lg:p-8">
@@ -98,6 +81,8 @@ function AddReward() {
               onSubmit={handleSubmit}
               className="rounded-2xl border border-gray-200 bg-white p-7"
             >
+              {error && <ErrorState description={error} onRetry={item ? () => model.load() : undefined} />}
+              <fieldset disabled={busy}>
               <div className="mb-8 flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-[#b7192e]">
                   <Gift size={21} />
@@ -105,7 +90,7 @@ function AddReward() {
 
                 <div>
                   <h2 className="font-bold text-gray-800">
-                    Grocery Voucher Details
+                    Voucher Details
                   </h2>
 
                   <p className="mt-1 text-sm text-gray-400">
@@ -118,6 +103,8 @@ function AddReward() {
               <div className="grid gap-6 lg:grid-cols-2">
                 {/* Left */}
                 <div className="space-y-5">
+                  <label className="block text-sm font-semibold text-gray-700">Voucher Name<input name="name" required maxLength={255} value={formData.name} onChange={handleChange} className="mt-2 h-12 w-full rounded-xl border border-gray-300 px-4 text-sm" /></label>
+                  <label className="block text-sm font-semibold text-gray-700">Category<select name="category" required value={formData.category} onChange={handleChange} className="mt-2 h-12 w-full rounded-xl border border-gray-300 bg-white px-4 text-sm outline-none focus:border-[#b7192e]">{REWARD_CATEGORIES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</select></label>
                   <div>
                     <label
                       htmlFor="voucherValue"
@@ -126,19 +113,7 @@ function AddReward() {
                       Voucher Value
                     </label>
 
-                    <select
-                      id="voucherValue"
-                      name="voucherValue"
-                      value={formData.voucherValue}
-                      onChange={handleChange}
-                      className="h-12 w-full rounded-xl border border-gray-300 bg-white px-4 text-sm outline-none focus:border-[#b7192e]"
-                    >
-                      {voucherValues.map((value) => (
-                        <option key={value} value={value}>
-                          ₱{value.toLocaleString()}
-                        </option>
-                      ))}
-                    </select>
+                    <input id="voucherValue" name="voucherValue" type="number" min="0.01" max="100000" step="0.01" required value={formData.voucherValue} onChange={handleChange} className="h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none focus:border-[#b7192e]" />
                   </div>
 
                   <div>
@@ -232,7 +207,7 @@ function AddReward() {
                     </span>
 
                     <span className="mt-1 text-xs text-gray-400">
-                      JPG or PNG
+                      JPG or PNG, up to 5 MB
                     </span>
 
                     <input
@@ -258,9 +233,10 @@ function AddReward() {
                   type="submit"
                   className="min-h-11 rounded-xl bg-[#b7192e] px-6 text-sm font-semibold text-white"
                 >
-                  Save Grocery Voucher
+                  {busy ? 'Saving...' : 'Save Voucher'}
                 </button>
               </div>
+              </fieldset>
             </form>
           </div>
         </div>
@@ -269,4 +245,9 @@ function AddReward() {
   );
 }
 
-export default AddReward;
+export default function AddReward() {
+  const { id } = useParams();
+  const remote = useRewards(id ?? 'new');
+  if (remote.loading || (id && (!remote.item || remote.item.status === 'deleted'))) return <div className="flex min-h-screen bg-[#f7f8fa]"><Sidebar /><main className="min-w-0 flex-1"><Header title="LifeFlow Voucher" /><div className="p-6">{remote.loading ? <PageSkeleton /> : <ErrorState description={remote.error || 'Deleted rewards must be restored before editing.'} onRetry={() => remote.model.load()} />}</div></main></div>;
+  return <RewardForm key={remote.item ? `${remote.item.id}:${remote.item.updated_at}:${remote.item.stock}` : 'new'} remote={remote} />;
+}

@@ -1,4 +1,4 @@
-import { EmptyState } from '../components/ui/PageState';
+import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,14 +10,31 @@ import {
   Eye,
 
   RotateCcw,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 
-import { verificationRequests } from '../data/verification';
+import { useVerifications } from '../services/useVerifications';
+import { filterVerifications, VERIFICATION_STATUS_LABELS } from '../services/verificationsApi';
+
+const statusAppearance = {
+  for_verification: { icon: Clock3, className: 'bg-amber-50 text-amber-600' },
+  needs_revision: { icon: RotateCcw, className: 'bg-orange-50 text-orange-600' },
+  completed: { icon: CircleCheck, className: 'bg-green-50 text-green-600' },
+  rejected: { icon: CircleX, className: 'bg-red-50 text-red-600' },
+};
 
 function Verification() {
+  const remote = useVerifications();
+  return <VerificationView remote={remote} />;
+}
+
+export function VerificationView({ remote }) {
+  const { items: verificationRequests, loading, error, model } = remote;
   const navigate = useNavigate();
 
   // ============================================================
@@ -28,24 +45,9 @@ function Verification() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
-
-  // ============================================================
-  // Temporary Verification Data
-  //
-  // Laravel will replace this later.
-  //
-  // Statuses:
-  // - for_verification
-  // - needs_revision
-  // - completed
-  // - rejected
-  // ============================================================
-
-
-
-  // ============================================================
-  // Date Helpers
-  // ============================================================
+  const currentYear = Number(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila', year: 'numeric' }));
+  const visibleRequests = useMemo(() => verificationRequests.filter((request) =>
+    Object.hasOwn(VERIFICATION_STATUS_LABELS, request.status)), [verificationRequests]);
 
   const months = [
     ['01', 'January'],
@@ -62,14 +64,6 @@ function Verification() {
     ['12', 'December'],
   ];
 
-  const availableYears = useMemo(() => {
-    const years = verificationRequests.map((request) =>
-      request.submittedDate.substring(0, 4)
-    );
-
-    return [...new Set(years)].sort((a, b) => Number(b) - Number(a));
-  }, []);
-
   const formatDate = (dateString) => {
     const date = new Date(`${dateString}T00:00:00`);
 
@@ -85,7 +79,7 @@ function Verification() {
   // ============================================================
 
   const getCount = (status) =>
-    verificationRequests.filter(
+    visibleRequests.filter(
       (request) => request.status === status
     ).length;
 
@@ -93,34 +87,7 @@ function Verification() {
   // Search + Month/Year Filtering
   // ============================================================
 
-  const filteredRequests = verificationRequests.filter((request) => {
-    const matchesStatus = request.status === activeTab;
-
-    const searchValue = searchTerm.toLowerCase();
-
-    const matchesSearch =
-      request.donor.toLowerCase().includes(searchValue) ||
-      request.event.toLowerCase().includes(searchValue) ||
-      request.bloodType.toLowerCase().includes(searchValue);
-
-    const requestMonth = request.submittedDate.substring(5, 7);
-    const requestYear = request.submittedDate.substring(0, 4);
-
-    const matchesMonth =
-      selectedMonth === 'all' ||
-      requestMonth === selectedMonth;
-
-    const matchesYear =
-      selectedYear === 'all' ||
-      requestYear === selectedYear;
-
-    return (
-      matchesStatus &&
-      matchesSearch &&
-      matchesMonth &&
-      matchesYear
-    );
-  });
+  const filteredRequests = filterVerifications(visibleRequests, activeTab, searchTerm, selectedMonth, selectedYear);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -144,7 +111,7 @@ function Verification() {
     if (status === 'needs_revision') {
       return (
         <span className="inline-flex rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700">
-          Needs Revision
+          Need Revision
         </span>
       );
     }
@@ -192,82 +159,33 @@ function Verification() {
           {/* ==================================================
               Summary Cards
               ================================================== */}
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {/* For Verification */}
-            <article className="rounded-2xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    For Verification
-                  </p>
-
-                  <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {getCount('for_verification')}
-                  </h3>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                  <Clock3 size={21} />
-                </div>
-              </div>
-            </article>
-
-            {/* Needs Revision */}
-            <article className="rounded-2xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    Needs Revision
-                  </p>
-
-                  <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {getCount('needs_revision')}
-                  </h3>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
-                  <RotateCcw size={21} />
-                </div>
-              </div>
-            </article>
-
-            {/* Completed */}
-            <article className="rounded-2xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    Completed
-                  </p>
-
-                  <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {getCount('completed')}
-                  </h3>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-600">
-                  <CircleCheck size={21} />
-                </div>
-              </div>
-            </article>
-
-            {/* Rejected */}
-            <article className="rounded-2xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    Rejected
-                  </p>
-
-                  <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {getCount('rejected')}
-                  </h3>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600">
-                  <CircleX size={21} />
-                </div>
-              </div>
-            </article>
+          <section aria-label="Verification status" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {Object.entries(VERIFICATION_STATUS_LABELS).map(([status, label]) => {
+              const { icon: Icon, className } = statusAppearance[status];
+              return <button
+                key={status}
+                type="button"
+                onClick={() => setActiveTab(status)}
+                aria-label={`Show ${label} records`}
+                aria-pressed={activeTab === status}
+                className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-red-200 hover:bg-red-50/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] ${
+                  activeTab === status ? 'border-red-200 bg-red-50/30' : 'border-gray-200 bg-white'
+                }`}
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-gray-500">{label}</span>
+                    <span className="mt-2 block text-2xl font-bold text-gray-900">{getCount(status)}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${className}`}>
+                      <Icon size={21} aria-hidden="true" />
+                    </span>
+                    <ArrowRight size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
+                  </span>
+                </span>
+              </button>;
+            })}
           </section>
 
           {/* ==================================================
@@ -277,12 +195,7 @@ function Verification() {
             {/* Status Tabs */}
             <div className="border-b border-gray-200 px-6 pt-5">
               <div className="flex flex-wrap gap-6">
-                {[
-                  ['for_verification', 'For Verification'],
-                  ['needs_revision', 'Needs Revision'],
-                  ['completed', 'Completed'],
-                  ['rejected', 'Rejected'],
-                ].map(([id, label]) => (
+                {Object.entries(VERIFICATION_STATUS_LABELS).map(([id, label]) => (
                   <button
                     key={id}
                     type="button"
@@ -336,21 +249,20 @@ function Verification() {
                 ))}
               </select>
 
-              <select
-                value={selectedYear}
-                onChange={(event) =>
-                  setSelectedYear(event.target.value)
-                }
-                className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"
-              >
-                <option value="all">All Years</option>
-
-                {availableYears.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
+              <div role="group" aria-label="Verification year" className="flex h-11 shrink-0 items-center rounded-xl border border-gray-200 bg-white">
+                <button type="button" aria-label="Previous year" onClick={() => setSelectedYear((year) => String((year === 'all' ? currentYear : Number(year)) - 1))}
+                  className="flex h-full w-11 items-center justify-center rounded-l-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
+                  <ChevronDown size={18} aria-hidden="true" />
+                </button>
+                <button type="button" aria-label="All years" aria-pressed={selectedYear === 'all'} title="All Years" onClick={() => setSelectedYear('all')}
+                  className="h-full w-24 text-center text-sm font-semibold tabular-nums text-gray-700 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
+                  {selectedYear === 'all' ? 'All Years' : selectedYear}
+                </button>
+                <button type="button" aria-label="Next year" onClick={() => setSelectedYear((year) => String((year === 'all' ? currentYear : Number(year)) + 1))}
+                  className="flex h-full w-11 items-center justify-center rounded-r-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
+                  <ChevronUp size={18} aria-hidden="true" />
+                </button>
+              </div>
 
               <button
                 type="button"
@@ -364,6 +276,8 @@ function Verification() {
             {/* ==================================================
                 Verification Table
                 ================================================== */}
+            {loading && <PageSkeleton />}
+            {error && <ErrorState description={error} onRetry={model.load} />}
             <div className="w-full overflow-x-auto">
               <table className="w-full min-w-[640px] table-fixed text-left">
                 <thead>
@@ -395,7 +309,7 @@ function Verification() {
                 </thead>
 
                 <tbody>
-                  {filteredRequests.map((request) => (
+                  {!loading && !error && filteredRequests.map((request) => (
                     <tr
                       key={request.id}
                       className="border-b border-gray-100 last:border-0"
@@ -446,7 +360,7 @@ function Verification() {
               </table>
 
               {/* Empty State */}
-              {filteredRequests.length === 0 && (
+              {!loading && !error && filteredRequests.length === 0 && (
                 <EmptyState title="No verification records found" />
               )}
             </div>

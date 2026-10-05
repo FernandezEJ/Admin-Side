@@ -1,5 +1,4 @@
-import { EmptyState } from '../components/ui/PageState';
-import { useMemo, useState } from 'react';
+import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
 
 
 import {
@@ -14,19 +13,12 @@ import {
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 
-import { donors } from '../data/donors';
+import { useDonors } from '../services/useDonors';
 
-function Donors() {
-
-
-  // ============================================================
-  // Page State
-  // ============================================================
-
-  const [activeTab, setActiveTab] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBloodType, setSelectedBloodType] = useState('all');
-  const [selectedEligibility, setSelectedEligibility] = useState('all');
+export function DonorsView({ remote }) {
+  const { data, loading, error, activeTab, searchTerm, selectedBloodType, selectedEligibility, model } = remote;
+  const { setActiveTab, setSearchTerm, setSelectedBloodType, setSelectedEligibility, clearFilters } = model;
+  const donors = data?.donors ?? [];
   const getAchievementClasses = (achievement) => {
   switch (achievement) {
     case 'Bronze Donor':
@@ -38,8 +30,8 @@ function Donors() {
     case 'Gold Donor':
       return 'bg-yellow-100 text-yellow-700';
 
-    case 'Platinum Donor':
-      return 'bg-slate-200 text-slate-700';
+    case 'First-Time Donor':
+      return 'bg-red-50 text-[#b7192e]';
 
     default:
       return 'bg-gray-100 text-gray-600';
@@ -47,18 +39,13 @@ function Donors() {
 };
 
   // ============================================================
-  // Temporary Donor Data
-  // Laravel will provide these records later.
-  // ============================================================
-
-
-
-  // ============================================================
   // Helpers
   // ============================================================
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown';
     const date = new Date(`${dateString}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return 'Unknown';
 
     return date.toLocaleDateString('en-US', {
       month: 'short',
@@ -67,66 +54,18 @@ function Donors() {
     });
   };
 
-  const totalDonors = donors.length;
-
-  const eligibleDonors = donors.filter(
-    (donor) => donor.eligibility === 'eligible'
-  ).length;
-
-  const temporarilyIneligibleDonors = donors.filter(
-    (donor) =>
-      donor.eligibility === 'temporarily_ineligible'
-  ).length;
-
-  const bloodTypes = useMemo(
-    () => [
-      ...new Set(
-        donors.map((donor) => donor.bloodType)
-      ),
-    ],
-    []
-  );
-
-  // ============================================================
-  // All Donors Filtering
-  // ============================================================
-
-  const filteredDonors = donors.filter((donor) => {
-    const searchValue = searchTerm.toLowerCase();
-
-    const matchesSearch =
-      donor.name.toLowerCase().includes(searchValue) ||
-      donor.bloodType.toLowerCase().includes(searchValue);
-
-    const matchesBloodType =
-      selectedBloodType === 'all' ||
-      donor.bloodType === selectedBloodType;
-
-    const matchesEligibility =
-      selectedEligibility === 'all' ||
-      donor.eligibility === selectedEligibility;
-
-    return (
-      matchesSearch &&
-      matchesBloodType &&
-      matchesEligibility
-    );
-  });
+  const totalDonors = data?.summary.totalDonors;
+  const eligibleDonors = data?.summary.eligible;
+  const temporarilyIneligibleDonors = data?.summary.temporarilyIneligible;
+  const bloodTypes = data?.bloodTypes ?? [];
+  const pagination = data?.pagination;
 
   // ============================================================
   // Leaderboard
   // Highest completed donations first.
   // ============================================================
 
-  const topDonors = [...donors].sort(
-    (a, b) => b.totalDonations - a.totalDonations
-  );
-
-  const clearFilters = () => {
-    setSearchTerm('');
-    setSelectedBloodType('all');
-    setSelectedEligibility('all');
-  };
+  const topDonors = data?.topDonors ?? [];
 
   // ============================================================
   // Eligibility Badge
@@ -139,6 +78,13 @@ function Donors() {
           Eligible
         </span>
       );
+    }
+
+    if (eligibility === 'unassessed') {
+      return <span className="inline-flex rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600">Not Assessed</span>;
+    }
+    if (eligibility !== 'temporarily_ineligible') {
+      return <span className="inline-flex rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">Needs Screening</span>;
     }
 
     return (
@@ -172,6 +118,9 @@ function Donors() {
             </p>
           </section>
 
+          {loading && !data && <PageSkeleton />}
+          {!loading && error && <ErrorState title="Unable to load Donors" description={error} onRetry={() => model.load()} />}
+          {!error && data && <>
           {/* ==================================================
               Summary Cards
               ================================================== */}
@@ -328,6 +277,8 @@ function Donors() {
                     <option value="temporarily_ineligible">
                       Temporarily Ineligible
                     </option>
+                    <option value="unassessed">Not Assessed</option>
+                    <option value="indeterminate">Needs Screening</option>
                   </select>
 
                   <button
@@ -340,6 +291,8 @@ function Donors() {
                 </div>
 
                 {/* Keep wide tables inside their scrolling container. */}
+                {loading && <PageSkeleton />}
+                {!loading && <>
                 <div className="w-full overflow-x-auto">
                   <table className="w-full min-w-[640px] table-fixed text-left">
                     <thead>
@@ -369,7 +322,7 @@ function Donors() {
                     </thead>
 
                     <tbody>
-                      {filteredDonors.map((donor) => (
+                      {donors.map((donor) => (
                         <tr
                           key={donor.id}
                           className="border-b border-gray-100 last:border-0"
@@ -386,7 +339,7 @@ function Donors() {
 
                           <td className="px-3 py-5">
                             <span className="inline-flex min-w-10 justify-center rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#b7192e]">
-                              {donor.bloodType}
+                              {donor.bloodType ?? 'Unknown'}
                             </span>
                           </td>
 
@@ -414,10 +367,21 @@ function Donors() {
                     </tbody>
                   </table>
 
-                  {filteredDonors.length === 0 && (
-                    <EmptyState title="No donors found" />
+                  {donors.length === 0 && (
+                    <EmptyState title={totalDonors === 0 ? 'No donors registered' : 'No donors found'}
+                      description={totalDonors === 0 ? 'Active donor accounts will appear here.' : 'Try changing your search or filters.'} />
                   )}
                 </div>
+                <nav aria-label="Donor pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-4 py-4 sm:px-6">
+                  <p className="text-sm text-gray-500">Page {pagination.currentPage} of {pagination.lastPage}</p>
+                  <div className="flex gap-2">
+                    <button type="button" disabled={pagination.currentPage <= 1} onClick={() => model.setPage(pagination.currentPage - 1)}
+                      className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">Previous</button>
+                    <button type="button" disabled={pagination.currentPage >= pagination.lastPage} onClick={() => model.setPage(pagination.currentPage + 1)}
+                      className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
+                  </div>
+                </nav>
+                </>}
               </>
             )}
 
@@ -455,7 +419,7 @@ function Donors() {
 
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                             <span className="text-xs text-gray-400">
-                            Blood Type {donor.bloodType}
+                            Blood Type {donor.bloodType ?? 'Unknown'}
                             </span>
 
                             <span className="text-gray-300">•</span>
@@ -484,14 +448,19 @@ function Donors() {
 
                     </div>
                   ))}
+                  {topDonors.length === 0 && <EmptyState title="No donors registered" description="Active donor accounts will appear here." />}
                 </div>
               </div>
             )}
           </section>
+          </>}
         </div>
       </main>
     </div>
   );
 }
 
-export default Donors;
+export default function Donors() {
+  const remote = useDonors();
+  return <DonorsView remote={remote} />;
+}

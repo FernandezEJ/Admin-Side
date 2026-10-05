@@ -1,19 +1,35 @@
 import LogoMascot from '../assets/LogoMascot.png';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAdminSession } from '../auth/useAdminSession';
+import { useRef, useState } from 'react';
+import SessionState from '../auth/SessionState';
 
 function Login() {
-  const { login, isAuthenticated } = useAdminSession();
+  const { login, isAuthenticated, isLoading, sessionError, mustChangePassword } = useAdminSession();
   const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const submitting = useRef(false);
 
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  if (isLoading || sessionError) return <SessionState />;
+  if (isAuthenticated) return <Navigate to={mustChangePassword ? '/change-initial-password' : '/dashboard'} replace />;
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-
-    // Mock only: credentials are neither transmitted nor persisted.
-    login({ remember: new FormData(event.currentTarget).has('remember') });
-    navigate('/dashboard', { replace: true });
+    if (submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    setError('');
+    const data = new FormData(event.currentTarget);
+    try {
+      const user = await login({ email: data.get('email'), password: data.get('password'), remember: data.has('remember') });
+      navigate(user.must_change_password ? '/change-initial-password' : '/dashboard', { replace: true });
+    } catch (failure) {
+      setError(failure.status === 401 || failure.status === 403 ? 'Invalid email or password.' : failure.message);
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
   };
 
   return (
@@ -68,7 +84,8 @@ function Login() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-8">
+          <form onSubmit={handleSubmit} className="mt-8" aria-busy={busy}>
+            {error && <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
             {/* Admin email */}
             <div className="mb-5">
               <label
@@ -115,6 +132,7 @@ function Login() {
                 <input
                   type="checkbox"
                   name="remember"
+                  defaultChecked
                   className="h-4 w-4 accent-[#b7192e]"
                 />
 
@@ -125,19 +143,20 @@ function Login() {
                   This will later navigate to the admin password recovery flow. */}
               <button
                 type="button"
+                disabled
+                title="Password recovery is not available yet"
                 className="text-left text-sm font-semibold text-[#b7192e] hover:underline"
               >
                 Forgot password?
               </button>
             </div>
 
-            {/* BACKEND READY:
-                Later this button will submit credentials to Laravel. */}
             <button
               type="submit"
+              disabled={busy}
               className="h-13 w-full rounded-xl bg-[#b7192e] text-sm font-bold text-white transition hover:bg-[#9f1427]"
             >
-              Sign In
+              {busy ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
 

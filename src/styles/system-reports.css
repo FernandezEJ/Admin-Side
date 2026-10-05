@@ -1,4 +1,15 @@
+.report-print-status {
+  display: none;
+}
+
 @media print {
+  .report-unavailable #monthly-report {
+    display: none;
+  }
+
+  .report-unavailable .report-print-status {
+    display: block;
+  }
   @page {
     size: A4 portrait;
     margin: 12mm;

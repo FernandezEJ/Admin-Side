@@ -1,3 +1,5 @@
+import { useAnnouncements } from '../services/useAnnouncements';
+import { ErrorState, PageSkeleton } from '../components/ui/PageState';
 import { ArrowLeft, MapPin, CalendarDays } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -8,19 +10,7 @@ function ViewAnnouncement() {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  // Temporary data.
-  // Laravel GET /api/admin/announcements/{id} will replace this later.
-  const announcement = {
-    id,
-    title: 'Community Blood Donation Drive',
-    description:
-      'Join the community blood donation activity and help save lives.',
-    location: 'City Health Office',
-    donationDate: 'September 28, 2026',
-    publishedDate: 'September 16, 2026',
-    expiresDate: 'September 28, 2026',
-    status: 'Active',
-  };
+  const { item: announcement, loading, error, model } = useAnnouncements(id);
 
   return (
     <div className="flex min-h-screen bg-[#f7f8fa]">
@@ -43,10 +33,10 @@ function ViewAnnouncement() {
               Back to Announcements
             </button>
 
-            <article className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            {loading ? <PageSkeleton /> : error ? <ErrorState description={error} onRetry={model.load} /> : announcement && <article className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
               {/* Image placeholder */}
               <div className="flex h-64 items-center justify-center bg-gray-100 text-sm text-gray-400">
-                Announcement Image
+                {announcement.image_url ? <img src={announcement.image_url} alt={announcement.title} className="h-full w-full object-contain" /> : 'No announcement image'}
               </div>
 
               <div className="p-7">
@@ -104,7 +94,7 @@ function ViewAnnouncement() {
                   </div>
                 </div>
               </div>
-            </article>
+            </article>}
           </div>
         </div>
       </main>

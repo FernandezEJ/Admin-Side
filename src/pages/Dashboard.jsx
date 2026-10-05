@@ -23,92 +23,26 @@ import Header from '../components/layout/Header';
 import { useAdminSession } from '../auth/useAdminSession';
 import SuperAdminOverview from '../components/SuperAdminOverview';
 
-function Dashboard() {
+import { Link } from 'react-router-dom';
+import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { useDashboard } from '../services/useDashboard';
+import { BLOOD_TYPE_COLORS } from '../data/bloodTypeColors';
+
+export function DashboardView({ remote }) {
   const { isSuperAdmin } = useAdminSession();
-  // ============================================================
-  // Temporary Dashboard Data
-  // Laravel will provide these values later.
-  // ============================================================
-
-  const dashboardStats = [
-    {
-      title: 'Total Donors',
-      value: '1,248',
-      description: 'Registered donors',
-      icon: Users,
-    },
-    {
-      title: 'Eligible',
-      value: '936',
-      description: 'Currently eligible',
-      icon: CircleCheck,
-    },
-    {
-      title: 'Temporarily Ineligible',
-      value: '312',
-      description: 'Based on latest evaluation',
-      icon: Clock3,
-    },
-  ];
-
-  // Monthly completed donations.
-  const donationActivity = [
-    { month: 'Apr', donations: 38 },
-    { month: 'May', donations: 55 },
-    { month: 'Jun', donations: 48 },
-    { month: 'Jul', donations: 67 },
-    { month: 'Aug', donations: 74 },
-    { month: 'Sep', donations: 83 },
-  ];
-
-  // Registered donor blood type distribution.
-  const bloodTypeData = [
-    { bloodType: 'O+', count: 342 },
-    { bloodType: 'A+', count: 276 },
-    { bloodType: 'B+', count: 218 },
-    { bloodType: 'AB+', count: 126 },
-    { bloodType: 'O−', count: 103 },
-    { bloodType: 'A−', count: 81 },
-    { bloodType: 'B−', count: 64 },
-    { bloodType: 'AB−', count: 38 },
-  ];
-
-  // Recharts needs colors for individual pie segments.
-  const bloodTypeColors = [
-    '#b7192e',
-    '#d9465f',
-    '#ef6a7d',
-    '#f38f9d',
-    '#7f1d2d',
-    '#9f2940',
-    '#c04a5e',
-    '#e07a88',
-  ];
-
-  // Temporary verification requests.
-  const recentVerificationRequests = [
-    {
-      id: 1,
-      donor: 'Juan Dela Cruz',
-      bloodType: 'O+',
-      event: 'Community Blood Drive',
-      submitted: 'Sep 16, 2026',
-    },
-    {
-      id: 2,
-      donor: 'Maria Santos',
-      bloodType: 'A+',
-      event: 'LifeFlow Donation Event',
-      submitted: 'Sep 16, 2026',
-    },
-    {
-      id: 3,
-      donor: 'Carlo Reyes',
-      bloodType: 'B+',
-      event: 'Red Cross Donation',
-      submitted: 'Sep 15, 2026',
-    },
-  ];
+  const { data, loading, error, chartLoading, chartError, months, model } = remote;
+  const dashboardStats = data ? [
+    { title: 'Donors', value: data.stats.donors, description: 'Active registered donors', icon: Users, to: '/donors' },
+    { title: 'Total Eligible', value: data.stats.eligible, description: 'Based on latest saved assessment', icon: CircleCheck },
+    { title: 'Total Not Eligible', value: data.stats.not_eligible, description: 'Based on latest saved assessment', icon: Clock3 },
+  ] : [];
+  const donationActivity = data?.donation_activity ?? [];
+  const bloodTypeData = data?.blood_types ?? [];
+  const recentVerificationRequests = data?.recent_verifications ?? [];
+  const submitted = (request) => {
+    const value = request.proof_uploaded_at ?? request.updated_at;
+    return value ? new Date(value).toLocaleDateString('en-US', { timeZone: data.timezone, month: 'short', day: 'numeric', year: 'numeric' }) : 'Unavailable';
+  };
 
   return (
     <div className="flex min-h-screen bg-[#f7f8fa]">
@@ -121,17 +55,22 @@ function Dashboard() {
         <Header />
 
         <div className="space-y-6 p-4 lg:p-8">
+          {loading && !data && <PageSkeleton />}
+          {error && !data && <ErrorState title="Unable to load Dashboard" description={error} onRetry={() => model.load()} />}
+          {data && <>
           {/* ==================================================
               Summary Cards
               ================================================== */}
           <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {dashboardStats.map((stat) => {
               const Icon = stat.icon;
+              const Card = stat.to ? Link : 'article';
 
               return (
-                <article
+                <Card
                   key={stat.title}
-                  className="rounded-2xl border border-gray-200 bg-white p-6"
+                  {...(stat.to ? { to: stat.to } : {})}
+                  className={`rounded-2xl border border-gray-200 bg-white p-6${stat.to ? ' cursor-pointer transition hover:border-red-200 hover:bg-red-50/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]' : ''}`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-[#b7192e]">
@@ -141,6 +80,7 @@ function Dashboard() {
                     <span className="text-sm font-semibold text-gray-500">
                       {stat.title}
                     </span>
+                    {stat.to && <ArrowRight size={16} aria-hidden="true" className="ml-auto shrink-0 text-gray-400" />}
                   </div>
 
                   <h2 className="mt-6 text-3xl font-bold text-gray-900">
@@ -150,7 +90,7 @@ function Dashboard() {
                   <p className="mt-1 text-xs text-gray-400">
                     {stat.description}
                   </p>
-                </article>
+                </Card>
               );
             })}
           </section>
@@ -172,13 +112,17 @@ function Dashboard() {
                   </p>
                 </div>
 
-                <select className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-600 outline-none focus:border-[#b7192e]">
-                  <option>Last 6 months</option>
-                  <option>Last 12 months</option>
+                <select aria-label="Donation Activity period" value={months} onChange={(event) => model.load(Number(event.target.value))} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-600 outline-none focus:border-[#b7192e]">
+                  <option value={6}>Last 6 months</option>
+                  <option value={12}>Last 12 months</option>
                 </select>
               </div>
 
-              <div className="h-72 w-full">
+              <div className="relative h-72 w-full" aria-busy={!!chartLoading}>
+                {chartLoading ? <div role="status" aria-label="Loading Donation Activity" className="flex h-full items-center justify-center">
+                  <span aria-hidden="true" className="h-6 w-6 rounded-full border-2 border-red-100 border-t-[#b7192e] motion-safe:animate-spin" />
+                </div> : chartError ? <ErrorState title="Unable to load Donation Activity" description={chartError} onRetry={() => model.load()} /> : <>
+                {!donationActivity.some((item) => item.donations > 0) && <p role="status" className="absolute left-0 top-0 text-sm text-gray-500">No completed donations in this period.</p>}
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={donationActivity}>
                     <CartesianGrid
@@ -226,6 +170,7 @@ function Dashboard() {
                     />
                   </BarChart>
                 </ResponsiveContainer>
+                </>}
               </div>
             </article>
 
@@ -243,7 +188,7 @@ function Dashboard() {
 
               {/* Donut chart */}
               <div className="h-56 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                {!bloodTypeData.some((item) => item.count > 0) ? <EmptyState title="No blood type data" description="Donor blood types will appear here when available." /> : <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={bloodTypeData}
@@ -255,19 +200,16 @@ function Dashboard() {
                       outerRadius={82}
                       paddingAngle={2}
                     >
-                      {bloodTypeData.map((entry, index) => (
+                      {bloodTypeData.map((entry) => (
                         <Cell
                           key={entry.bloodType}
-                          fill={
-                            bloodTypeColors[
-                              index % bloodTypeColors.length
-                            ]
-                          }
+                          fill={BLOOD_TYPE_COLORS[entry.bloodType] ?? '#6B7280'}
                         />
                       ))}
                     </Pie>
 
                     <Tooltip
+                      itemStyle={{ color: '#374151' }}
                       contentStyle={{
                         borderRadius: '10px',
                         border: '1px solid #eeeeee',
@@ -275,12 +217,12 @@ function Dashboard() {
                       }}
                     />
                   </PieChart>
-                </ResponsiveContainer>
+                </ResponsiveContainer>}
               </div>
 
               {/* Blood type values */}
               <div className="grid grid-cols-2 gap-x-5 gap-y-3">
-                {bloodTypeData.map((item, index) => (
+                {bloodTypeData.map((item) => (
                   <div
                     key={item.bloodType}
                     className="flex items-center justify-between text-sm"
@@ -289,10 +231,7 @@ function Dashboard() {
                       <span
                         className="h-2.5 w-2.5 rounded-full"
                         style={{
-                          backgroundColor:
-                            bloodTypeColors[
-                              index % bloodTypeColors.length
-                            ],
+                          backgroundColor: BLOOD_TYPE_COLORS[item.bloodType] ?? '#6B7280',
                         }}
                       />
 
@@ -301,7 +240,7 @@ function Dashboard() {
                       </span>
                     </div>
 
-                    <span className="text-gray-400">
+                    <span className="text-gray-600">
                       {item.count}
                     </span>
                   </div>
@@ -321,19 +260,20 @@ function Dashboard() {
                 </h2>
 
                 <p className="mt-1 text-xs text-gray-400">
-                  Latest donor proof submissions awaiting review
+                  Latest submissions awaiting review or revision
                 </p>
               </div>
 
-              <button
-                type="button"
+              <Link
+                to="/verification"
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#b7192e] transition hover:bg-red-50"
               >
                 View all
                 <ArrowRight size={16} />
-              </button>
+              </Link>
             </div>
 
+            {!recentVerificationRequests.length && <EmptyState title="No verification requests" description="Submitted proofs will appear here when available." />}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-left">
                 <thead>
@@ -373,30 +313,30 @@ function Dashboard() {
                       </td>
 
                       <td className="px-3 py-4 text-sm text-gray-500">
-                        {request.bloodType}
+                        {request.bloodType ?? 'Unknown'}
                       </td>
 
                       <td className="px-3 py-4 text-sm text-gray-500">
-                        {request.event}
+                        {request.event ?? 'Donation activity'}
                       </td>
 
                       <td className="px-3 py-4 text-sm text-gray-500">
-                        {request.submitted}
+                        {submitted(request)}
                       </td>
 
                       <td className="px-3 py-4">
                         <span className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-[#b7192e]">
-                          For Verification
+                          {request.status === 'needs_revision' ? 'Need Revision' : 'For Verification'}
                         </span>
                       </td>
 
                       <td className="px-3 py-4">
-                        <button
-                          type="button"
+                        <Link
+                          to={`/verification/${request.id}`}
                           className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-[#b7192e] transition hover:bg-red-50"
                         >
                           View
-                        </button>
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -404,11 +344,14 @@ function Dashboard() {
               </table>
             </div>
           </section>
-          {isSuperAdmin && <SuperAdminOverview />}
+          {isSuperAdmin && data.overview && <SuperAdminOverview overview={data.overview} />}
+          </>}
         </div>
       </main>
     </div>
   );
 }
 
-export default Dashboard;
+export default function Dashboard() {
+  return <DashboardView remote={useDashboard()} />;
+}

@@ -1,35 +1,42 @@
-import { useState } from 'react';
+import { useAnnouncements } from '../services/useAnnouncements';
+import { ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, ImagePlus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 
 function CreateAnnouncement() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const { item, loading, busy, error, model } = useAnnouncements(id || 'create');
 
   // ============================================================
   // Announcement Form State
   // ============================================================
 
-  const [formData, setFormData] = useState({
+  const [changes, setFormData] = useState(null);
+  const formData = changes ?? item ?? {
     title: '',
     description: '',
     location: '',
     donationDate: '',
     expiresDate: '',
     notifyDonors: true,
-  });
+  };
 
   const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState('');
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
 
-    setFormData((current) => ({
-      ...current,
+    setFormData({
+      ...formData,
       [name]: type === 'checkbox' ? checked : value,
-    }));
+    });
   };
 
   const handleImageChange = (event) => {
@@ -37,36 +44,15 @@ function CreateAnnouncement() {
 
     if (selectedFile) {
       setImage(selectedFile);
+      setPreview(URL.createObjectURL(selectedFile));
     }
   };
 
-  // ============================================================
-  // Save as Draft
-  // Later: POST to Laravel with status = draft.
-  // ============================================================
-
-  const handleSaveDraft = () => {
-    console.log('Save draft:', {
-      ...formData,
-      status: 'draft',
-      image,
-    });
+  const save = async (status) => {
+    if (await model.save(formData, image, status)) navigate('/announcements');
   };
-
-  // ============================================================
-  // Publish Announcement
-  // Later Laravel will automatically set published_at.
-  // ============================================================
-
-  const handlePublish = (event) => {
-    event.preventDefault();
-
-    console.log('Publish announcement:', {
-      ...formData,
-      status: 'published',
-      image,
-    });
-  };
+  const handleSaveDraft = () => save('draft');
+  const handlePublish = (event) => { event.preventDefault(); void save('published'); };
 
   return (
     <div className="flex min-h-screen bg-[#f7f8fa]">
@@ -74,7 +60,7 @@ function CreateAnnouncement() {
 
       <main className="min-w-0 flex-1">
         <Header
-          title="Create Announcement"
+          title={id ? "Edit Announcement" : "Create Announcement"}
           description="Create a new blood donation announcement for LifeFlow donors."
         />
 
@@ -89,7 +75,7 @@ function CreateAnnouncement() {
               Back to Announcements
             </button>
 
-            <form
+            {loading ? <PageSkeleton /> : error && id && !item ? <ErrorState description={error} onRetry={model.load} /> : <form
               onSubmit={handlePublish}
               className="rounded-2xl border border-gray-200 bg-white p-7"
             >
@@ -103,6 +89,7 @@ function CreateAnnouncement() {
                 </p>
               </div>
 
+              {error && <p role="alert" className="mb-4 text-sm text-red-700">{error}</p>}
               <div className="grid gap-6 lg:grid-cols-2">
                 {/* Left column */}
                 <div className="space-y-5">
@@ -186,8 +173,9 @@ function CreateAnnouncement() {
                           : 'Choose an image'}
                       </span>
 
+                      {(preview || item?.image_url) && <img src={preview || item.image_url} alt="Announcement preview" className="my-3 max-h-40 object-contain" />}
                       <span className="mt-1 text-xs text-gray-400">
-                        JPG or PNG
+                        JPG or PNG, up to 5 MB
                       </span>
 
                       <input
@@ -277,6 +265,7 @@ function CreateAnnouncement() {
 
                 <button
                   type="button"
+                  disabled={busy || item?.status === 'deleted'}
                   onClick={handleSaveDraft}
                   className="min-h-11 rounded-xl border border-[#b7192e] px-5 text-sm font-semibold text-[#b7192e] transition hover:bg-red-50"
                 >
@@ -284,13 +273,14 @@ function CreateAnnouncement() {
                 </button>
 
                 <button
+                  disabled={busy || item?.status === 'deleted'}
                   type="submit"
                   className="min-h-11 rounded-xl bg-[#b7192e] px-6 text-sm font-semibold text-white transition hover:bg-[#9f1427]"
                 >
-                  Publish Announcement
+                  {busy ? 'Saving...' : 'Publish Announcement'}
                 </button>
               </div>
-            </form>
+            </form>}
           </div>
         </div>
       </main>

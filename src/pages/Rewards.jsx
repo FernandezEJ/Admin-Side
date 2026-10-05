@@ -1,7 +1,8 @@
 import MonthFilter from '../components/ui/MonthFilter';
-import { recoveryDates, clearRecoveryDates, isRecoverable } from '../data/recoveryPolicy';
-import { mockRedemptions, filterRedemptions } from '../data/rewardRedemptions';
-import { EmptyState } from '../components/ui/PageState';
+import { useRewards } from '../services/useRewards';
+import { REWARD_CATEGORIES } from '../services/rewardsApi';
+import { filterRedemptions } from '../data/rewardRedemptions';
+import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,100 +16,36 @@ import {
   Trash2,
   Pencil,
   RotateCcw,
+  ArrowRight,
 } from 'lucide-react';
 
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import RewardsAnalytics from '../components/rewards/RewardsAnalytics';
 
-function Rewards() {
+export function RewardsView({ remote, initialTab = 'rewards' }) {
+  const { items: rewards, loading, error, busy, model } = remote;
   const navigate = useNavigate();
 
   // ============================================================
   // Page State
   // ============================================================
 
-  const [activeTab, setActiveTab] = useState('rewards');
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [rewardStatusTab, setRewardStatusTab] = useState('active');
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedVoucherValue, setSelectedVoucherValue] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
-  // ============================================================
-  // Temporary Rewards Data
-  // Laravel will replace this later.
-  // ============================================================
-
-  const [rewards, setRewards] = useState([
-    {
-      id: 1,
-      voucherValue: 500,
-      name: '₱500 Grocery Voucher',
-      pointsRequired: 350,
-      stock: 20,
-      status: 'active',
-    },
-    {
-      id: 2,
-      voucherValue: 300,
-      name: '₱300 Grocery Voucher',
-      pointsRequired: 250,
-      stock: 12,
-      status: 'active',
-    },
-    {
-      id: 3,
-      voucherValue: 200,
-      name: '₱200 Grocery Voucher',
-      pointsRequired: 150,
-      stock: 0,
-      status: 'inactive',
-    },
-    {
-      id: 4,
-      voucherValue: 100,
-      name: '₱100 Grocery Voucher',
-      pointsRequired: 100,
-      stock: 10,
-      status: 'deleted',
-              ...recoveryDates('2026-09-20T08:00:00Z'),
-    },
-  ]);
-
-  // ============================================================
-  // Temporary Redemption Data
-  // ============================================================
-
+  const [redemptionSearch, setRedemptionSearch] = useState('');
+  const [redemptionCategory, setRedemptionCategory] = useState('all');
   const [redemptionStatus, setRedemptionStatus] = useState('');
   const [redemptionMonth, setRedemptionMonth] = useState('');
-  const redemptions = filterRedemptions(mockRedemptions, redemptionStatus, redemptionMonth);
-  // ============================================================
-  // Fixed Grocery Voucher Values
-  // ============================================================
-
-  const voucherValues = [
-    100,
-    200,
-    300,
-    400,
-    500,
-    600,
-    700,
-    800,
-    900,
-    1000,
-  ];
+  const redemptions = filterRedemptions(remote.redemptions, redemptionStatus, redemptionMonth).filter((row) => (redemptionCategory === 'all' || row.category === redemptionCategory) && `${row.donor} ${row.reward}`.toLowerCase().includes(redemptionSearch.toLowerCase()));
 
   // ============================================================
   // Helpers
   // ============================================================
-
-  const formatCurrency = (value) =>
-    new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      maximumFractionDigits: 0,
-    }).format(value);
 
   const formatDate = (dateString) => {
     const date = new Date(`${dateString}T00:00:00`);
@@ -123,8 +60,8 @@ function Rewards() {
   const getCount = (status) =>
     rewards.filter((reward) => reward.status === status).length;
 
-  const totalStock = rewards
-    .filter((reward) => reward.status !== 'deleted')
+  const availableStock = rewards
+    .filter((reward) => reward.status === 'active')
     .reduce((total, reward) => total + reward.stock, 0);
 
   // ============================================================
@@ -139,79 +76,35 @@ function Rewards() {
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
 
-      const matchesVoucherValue =
-        selectedVoucherValue === 'all' ||
-        reward.voucherValue === Number(selectedVoucherValue);
+      const matchesCategory =
+        selectedCategory === 'all' ||
+        reward.category === selectedCategory;
 
       return (
         matchesStatus &&
         matchesSearch &&
-        matchesVoucherValue
+        matchesCategory
       );
     });
   }, [
     rewards,
     rewardStatusTab,
     searchTerm,
-    selectedVoucherValue,
+    selectedCategory,
   ]);
 
   const clearFilters = () => {
     setSearchTerm('');
-    setSelectedVoucherValue('all');
+    setSelectedCategory('all');
   };
 
-  // ============================================================
-  // Soft Delete
-  // Later: Laravel will use SoftDeletes.
-  // ============================================================
-
-  const handleDelete = (id) => {
-    const confirmed = window.confirm(
-      'Move this grocery voucher to Deleted? Recoverable for 30 days; permanent purge is handled later by the backend.'
-    );
-
-    if (!confirmed) return;
-
-    setRewards((current) =>
-      current.map((reward) =>
-        reward.id === id
-          ? {
-              ...reward,
-              status: 'deleted',
-              ...recoveryDates(),
-            }
-          : reward
-      )
-    );
+  const handleDelete = async (id) => {
+    if (!busy && window.confirm('Move this voucher to Deleted? It can be recovered for 30 days.')) await model.transition(id, 'delete');
   };
-
-  // ============================================================
-  // Restore
-  // Restored rewards ALWAYS go to Inactive.
-  // ============================================================
-
-  const handleRestore = (id) => {
-    if (!isRecoverable(rewards.find((item) => item.id === id) ?? {})) return;
-    const confirmed = window.confirm(
-      'Restore this reward to Inactive?'
-    );
-
-    if (!confirmed) return;
-
-    setRewards((current) =>
-      current.map((reward) =>
-        reward.id === id
-          ? {
-              ...reward,
-              ...clearRecoveryDates(),
-              status: 'inactive',
-            }
-          : reward
-      )
-    );
-
-    setRewardStatusTab('inactive');
+  const handleRestore = async (id) => {
+    if (!busy && window.confirm('Restore this reward to Inactive?')) {
+      if (await model.transition(id, 'restore')) setRewardStatusTab('inactive');
+    }
   };
 
   // ============================================================
@@ -246,29 +139,7 @@ function Rewards() {
   // Redemption Status Badge
   // ============================================================
 
-  const renderRedemptionStatus = (status) => {
-    if (status === 'inactive') {
-      return (
-        <span className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-          Inactive
-        </span>
-      );
-    }
-
-    if (status === 'active') {
-      return (
-        <span className="inline-flex rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
-          Active
-        </span>
-      );
-    }
-
-    return (
-      <span className="inline-flex rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600">
-        Expired
-      </span>
-    );
-  };
+  const renderRedemptionStatus = (status) => <span className="inline-flex rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600">{({ available: 'Available', active: 'Active', redeemed: 'Redeemed', expired: 'Expired' })[status] ?? status}</span>;
 
   return (
     <div className="flex min-h-screen bg-[#f7f8fa]">
@@ -277,21 +148,24 @@ function Rewards() {
       <main className="min-w-0 flex-1">
         <Header
           title="Rewards"
-          description="Manage grocery vouchers and donor redemptions."
+          description="Manage LifeFlow vouchers and donor redemptions."
         />
 
         <div className="space-y-6 p-4 lg:p-8">
+          {loading && <PageSkeleton />}
+          {error && <ErrorState title="Unable to complete Rewards request" description={error} onRetry={() => model.load()} />}
+          {!loading && <>
           {/* ==================================================
               Page Heading
               ================================================== */}
           <section hidden={activeTab === 'analytics'} className={activeTab === 'analytics' ? 'hidden' : 'flex flex-wrap items-center justify-between gap-4'}>
             <div>
               <h2 className="text-lg font-bold text-gray-800">
-                Grocery Voucher Management
+                Voucher Management
               </h2>
 
               <p className="mt-1 text-sm text-gray-400">
-                Manage grocery voucher values, points, stock,
+                Manage voucher values, points, stock,
                 and redemption history.
               </p>
             </div>
@@ -303,7 +177,7 @@ function Rewards() {
                 className="flex min-h-11 items-center gap-2 rounded-xl bg-[#b7192e] px-5 text-sm font-semibold text-white transition hover:bg-[#9f1427]"
               >
                 <Plus size={18} />
-                Add Grocery Voucher
+              Add Voucher
               </button>
             )}
           </section>
@@ -312,69 +186,40 @@ function Rewards() {
               Summary Cards
               ================================================== */}
           <section className={activeTab === 'analytics' ? 'hidden' : 'grid gap-4 sm:grid-cols-2 xl:grid-cols-4'}>
-            <article className="rounded-2xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    Active
-                  </p>
-
-                  <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {getCount('active')}
-                  </h3>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-600">
-                  <CircleCheck size={21} />
-                </div>
-              </div>
-            </article>
-
-            <article className="rounded-2xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    Inactive
-                  </p>
-
-                  <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {getCount('inactive')}
-                  </h3>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
-                  <CircleOff size={21} />
-                </div>
-              </div>
-            </article>
+            {[
+              { status: 'active', label: 'Active', icon: CircleCheck, iconClasses: 'bg-green-50 text-green-600' },
+              { status: 'inactive', label: 'Inactive', icon: CircleOff, iconClasses: 'bg-gray-100 text-gray-500' },
+              { status: 'deleted', label: 'Deleted', icon: Trash2, iconClasses: 'bg-red-50 text-red-600' },
+            ].map(({ status, label, icon: Icon, iconClasses }) => (
+              <button key={status} type="button"
+                onClick={() => { setActiveTab('rewards'); setRewardStatusTab(status); }}
+                aria-label={`Show ${label} vouchers`}
+                aria-pressed={activeTab === 'rewards' && rewardStatusTab === status}
+                className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-red-200 hover:bg-red-50/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] ${
+                  activeTab === 'rewards' && rewardStatusTab === status ? 'border-red-200 bg-red-50/30' : 'border-gray-200 bg-white'
+                }`}>
+                <span className="flex items-center justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-gray-500">{label}</span>
+                    <span className="mt-2 block text-2xl font-bold text-gray-900">{getCount(status)}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClasses}`}><Icon size={21} aria-hidden="true" /></span>
+                    <ArrowRight size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
+                  </span>
+                </span>
+              </button>
+            ))}
 
             <article className="rounded-2xl border border-gray-200 bg-white p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500">
-                    Deleted
+                    Available Stock
                   </p>
 
                   <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {getCount('deleted')}
-                  </h3>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600">
-                  <Trash2 size={21} />
-                </div>
-              </div>
-            </article>
-
-            <article className="rounded-2xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    Total Stock
-                  </p>
-
-                  <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {totalStock}
+                    {availableStock}
                   </h3>
                 </div>
 
@@ -461,7 +306,7 @@ function Rewards() {
             </div>
 
             <div id="rewards-analytics" hidden={activeTab !== 'analytics'}>
-              <RewardsAnalytics inventory={rewards} />
+              <RewardsAnalytics remote={remote} />
             </div>
 
             {/* ==================================================
@@ -483,25 +328,26 @@ function Rewards() {
                       onChange={(event) =>
                         setSearchTerm(event.target.value)
                       }
-                      placeholder="Search grocery vouchers..."
+                      placeholder="Search vouchers..."
                       className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm outline-none transition focus:border-[#b7192e] focus:bg-white"
                     />
                   </div>
 
                   <select
-                    value={selectedVoucherValue}
+                    aria-label="Category"
+                    value={selectedCategory}
                     onChange={(event) =>
-                      setSelectedVoucherValue(event.target.value)
+                      setSelectedCategory(event.target.value)
                     }
                     className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"
                   >
                     <option value="all">
-                      All Voucher Values
+                      All Categories
                     </option>
 
-                    {voucherValues.map((value) => (
+                    {REWARD_CATEGORIES.map(({ value, label }) => (
                       <option key={value} value={value}>
-                        {formatCurrency(value)}
+                        {label}
                       </option>
                     ))}
                   </select>
@@ -525,16 +371,17 @@ function Rewards() {
                       >
                         {/* Temporary image placeholder */}
                         <div className="flex h-44 items-center justify-center bg-gray-100">
+                          {reward.image_url ? <img src={reward.image_url} alt={reward.name} className="h-full w-full object-cover" /> : <>
                           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#b7192e] shadow-sm">
                             <Gift size={27} />
-                          </div>
+                          </div></>}
                         </div>
 
                         <div className="p-5">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                                Grocery Voucher
+                                LIFEFLOW VOUCHER
                               </p>
 
                               <h3 className="mt-1 font-bold text-gray-800">
@@ -543,7 +390,7 @@ function Rewards() {
                             </div>
 
                             {renderRewardStatus(reward.status)}
-                            {reward.status === 'deleted' && <p className="mt-2 text-xs text-gray-500">Recoverable for 30 days. Deletion scheduled: {reward.scheduled_for_deletion_at?.slice(0, 10)}. No automatic purge in preview.</p>}
+                            {reward.status === 'deleted' && <p className="mt-2 text-xs text-gray-500">Recoverable for 30 days. Deletion scheduled: {reward.scheduled_for_deletion_at?.slice(0, 10)}. Definitions with voucher history are retained.</p>}
                           </div>
 
                           {/* Points and Stock */}
@@ -576,6 +423,8 @@ function Rewards() {
                                 <button
                                   type="button"
                                   title="Edit reward"
+                                  disabled={busy}
+                                  onClick={() => navigate(`/rewards/${reward.id}/edit`)}
                                   className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-[#b7192e]"
                                 >
                                   <Pencil size={17} />
@@ -583,7 +432,7 @@ function Rewards() {
 
                                 <button
                                   type="button"
-                                  title="Delete reward"
+                                  title="Delete reward" disabled={busy}
                                   onClick={() =>
                                     handleDelete(reward.id)
                                   }
@@ -597,7 +446,7 @@ function Rewards() {
                             {reward.status === 'deleted' && (
                               <button
                                 type="button"
-                                disabled={!isRecoverable(reward)} title={isRecoverable(reward) ? 'Restore' : 'Recovery period ended; awaiting backend purge'}
+                                disabled={busy || !reward.recoverable} title={reward.recoverable ? 'Restore' : 'Recovery period ended; awaiting backend purge'}
                                 onClick={() =>
                                   handleRestore(reward.id)
                                 }
@@ -611,7 +460,7 @@ function Rewards() {
                       </article>
                     ))
                   ) : (
-                    <div className="col-span-full"><EmptyState title="No grocery vouchers found" /></div>
+                    <div className="col-span-full"><EmptyState title="No vouchers found" /></div>
                   )}
                 </div>
               </>
@@ -622,8 +471,11 @@ function Rewards() {
                 ================================================== */}
             {activeTab === 'redemptions' && (<>
               <div className="flex flex-wrap items-end gap-4 border-b border-gray-200 p-4">
-                <label className="text-sm text-gray-600">Status<select value={redemptionStatus} onChange={(event) => setRedemptionStatus(event.target.value)} className="mt-2 block h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="expired">Expired</option></select></label>
+                <label className="text-sm text-gray-600">Status<select aria-label="Redemption status" value={redemptionStatus} onChange={(event) => setRedemptionStatus(event.target.value)} className="mt-2 block h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"><option value="">All statuses</option><option value="available">Available</option><option value="redeemed">Redeemed</option><option value="expired">Expired</option></select></label>
+                <label className="text-sm text-gray-600">Search<input aria-label="Search redemptions" value={redemptionSearch} onChange={(event) => setRedemptionSearch(event.target.value)} className="mt-2 block h-11 rounded-xl border border-gray-200 px-4" /></label>
+                <label className="text-sm text-gray-600">Category<select aria-label="Redemption category" value={redemptionCategory} onChange={(event) => setRedemptionCategory(event.target.value)} className="mt-2 block h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"><option value="all">All Categories</option>{REWARD_CATEGORIES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</select></label>
                 <MonthFilter value={redemptionMonth} onChange={setRedemptionMonth} />
+                <button type="button" onClick={() => { setRedemptionSearch(''); setRedemptionCategory('all'); setRedemptionStatus(''); setRedemptionMonth(''); }} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">Clear</button>
               </div>
               <div className="w-full overflow-x-auto">
                 <table className="w-full min-w-[640px] table-fixed text-left">
@@ -686,10 +538,11 @@ function Rewards() {
               {!redemptions.length && <EmptyState title="No redemptions found" />}
               </>)}
           </section>
+          </>}
         </div>
       </main>
     </div>
   );
 }
 
-export default Rewards;
+export default function Rewards() { return <RewardsView remote={useRewards()} />; }

@@ -3,6 +3,7 @@ import RequireRole from './auth/RequireRole';
 import { ADMIN_ROLES } from './auth/roles';
 
 import Login from './pages/Login';
+import ChangeInitialPassword from './pages/ChangeInitialPassword';
 import Dashboard from './pages/Dashboard';
 import Announcements from './pages/Announcements';
 import CreateAnnouncement from './pages/CreateAnnouncement';
@@ -22,6 +23,9 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
+      <Route element={<RequireRole initialPassword />}>
+        <Route path="/change-initial-password" element={<ChangeInitialPassword />} />
+      </Route>
       <Route element={<RequireRole />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/announcements" element={<Announcements />} />
@@ -33,6 +37,7 @@ export function AppRoutes() {
         <Route path="/donors" element={<Donors />} />
         <Route path="/rewards" element={<Rewards />} />
         <Route path="/rewards/create" element={<AddReward />} />
+        <Route path="/rewards/:id/edit" element={<AddReward />} />
         <Route element={<RequireRole allowedRoles={[ADMIN_ROLES.SUPER_ADMIN]} />}>
           <Route path="/system-reports" element={<SystemReports />} />
           <Route path="/admin-management" element={<AdminManagement />} />
