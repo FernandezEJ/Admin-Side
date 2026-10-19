@@ -22,10 +22,15 @@ import {
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import RewardsAnalytics from '../components/rewards/RewardsAnalytics';
+import ClaimVerification from '../components/rewards/ClaimVerification';
+import { useAdminSession } from '../auth/useAdminSession';
+import { hasRole } from '../auth/roles';
 
 export function RewardsView({ remote, initialTab = 'rewards' }) {
   const { items: rewards, loading, error, busy, model } = remote;
   const navigate = useNavigate();
+  const { role, mustChangePassword, currentAdmin } = useAdminSession();
+  const canVerifyClaims = hasRole(role) && !mustChangePassword;
 
   // ============================================================
   // Page State
@@ -278,6 +283,13 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                 >
                   Analytics
                 </button>
+                {canVerifyClaims && <button
+                  type="button"
+                  onClick={() => setActiveTab('claims')}
+                  aria-pressed={activeTab === 'claims'}
+                  aria-controls="reward-claim-verification"
+                  className={`border-b-2 pb-4 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] ${activeTab === 'claims' ? 'border-[#b7192e] text-[#b7192e]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+                >Claim Verification</button>}
               </div>
 
               {/* Reward status filters */}
@@ -308,6 +320,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
             <div id="rewards-analytics" hidden={activeTab !== 'analytics'}>
               <RewardsAnalytics remote={remote} />
             </div>
+            {activeTab === 'claims' && canVerifyClaims && <ClaimVerification key={currentAdmin?.id ?? role} onClaimed={model.refreshClaims} />}
 
             {/* ==================================================
                 Rewards Tab

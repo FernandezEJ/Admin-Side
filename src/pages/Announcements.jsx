@@ -1,9 +1,9 @@
 import { filterAnnouncements } from '../services/announcementsApi';
 import { useAnnouncements } from '../services/useAnnouncements';
-import { isRecoverable } from '../data/recoveryPolicy';
 import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { AnnouncementPopup } from './ViewAnnouncement';
 
 import {
   Plus,
@@ -12,14 +12,9 @@ import {
   CalendarClock,
 
   Trash2,
-  Eye,
-  Pencil,
   MapPin,
-  RotateCcw,
   FileText,
   ArrowRight,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 
 import Sidebar from '../components/layout/Sidebar';
@@ -32,18 +27,30 @@ function Announcements() {
 
 export function AnnouncementsView({ remote }) {
   const navigate = useNavigate();
+  const { state } = useLocation();
+  const savedFilters = state?.announcementFilters;
+  const [selectedId, setSelectedId] = useState(null);
+  const tableRef = useRef(null);
+  const openAnnouncement = (id, row) => {
+    row.focus({ preventScroll: true });
+    setSelectedId(id);
+  };
 
   // ============================================================
   // Filters
   // ============================================================
 
-  const [activeTab, setActiveTab] = useState('active');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState('all');
-  const [selectedYear, setSelectedYear] = useState('all');
-  const currentYear = Number(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila', year: 'numeric' }));
+  const [activeTab, setActiveTab] = useState(savedFilters?.status ?? 'active');
+  const [searchTerm, setSearchTerm] = useState(savedFilters?.search ?? '');
+  const [selectedMonth, setSelectedMonth] = useState(savedFilters?.month ?? 'all');
+  const [selectedYear, setSelectedYear] = useState(savedFilters?.year ?? 'all');
+  const formNavigation = (path) => navigate(path, { state: { announcementFilters: {
+    status: activeTab, search: searchTerm, month: selectedMonth, year: selectedYear,
+  } } });
 
-  const { items: announcements, loading, error, busy, model } = remote;
+  const { items: announcements, loading, error, model } = remote;
+  // The existing unpaginated list contains every status and donation year.
+  const years = [...new Set([...announcements.map((item) => item.donationDate?.slice(0, 4)), selectedYear].filter((year) => /^\d{4}$/.test(year)))].sort().reverse();
 
   const months = [
     ['01', 'January'],
@@ -91,18 +98,6 @@ export function AnnouncementsView({ remote }) {
     setSelectedYear('all');
   };
 
-  // ============================================================
-  // Soft Delete
-  // Later this becomes a Laravel DELETE request.
-  // ============================================================
-
-  const handleDelete = (id) => {
-    if (!busy && window.confirm('Move this announcement to Deleted? Recovery is available for 30 days.')) model.action(id, 'delete');
-  };
-  const handleRestore = (id) => {
-    if (!busy && isRecoverable(announcements.find((item) => item.id === id) ?? {}) && window.confirm('Restore this announcement to Drafts?')) model.action(id, 'restore');
-  };
-
   return (
     <div className="flex min-h-screen bg-[#f7f8fa]">
       <Sidebar />
@@ -128,7 +123,7 @@ export function AnnouncementsView({ remote }) {
 
             <button
               type="button"
-              onClick={() => navigate('/announcements/create')}
+              onClick={() => formNavigation('/announcements/create')}
               className="flex min-h-11 items-center gap-2 rounded-xl bg-[#b7192e] px-5 text-sm font-semibold text-white transition hover:bg-[#9f1427]"
             >
               <Plus size={18} />
@@ -137,7 +132,7 @@ export function AnnouncementsView({ remote }) {
           </section>
 
           {/* Summary cards */}
-          <section aria-label="Announcement status" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section aria-label="Announcement status" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
                 label: 'Active',
@@ -200,34 +195,9 @@ export function AnnouncementsView({ remote }) {
 
           {/* Announcement list */}
           <section className="rounded-2xl border border-gray-200 bg-white">
-            {/* Tabs */}
-            <div className="border-b border-gray-200 px-6 pt-5">
-              <div className="flex flex-wrap gap-6">
-                {[
-                  ['active', 'Active'],
-                  ['draft', 'Drafts'],
-                  ['expired', 'Expired'],
-                  ['deleted', 'Deleted'],
-                ].map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setActiveTab(id)}
-                    className={`border-b-2 pb-4 text-sm font-semibold transition ${
-                      activeTab === id
-                        ? 'border-[#b7192e] text-[#b7192e]'
-                        : 'border-transparent text-gray-400 hover:text-gray-700'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">
-              <div className="relative min-w-0 w-full sm:min-w-64 flex-1">
+              <div className="relative min-w-0 w-full flex-1 sm:min-w-40">
                 <Search
                   size={17}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -245,6 +215,7 @@ export function AnnouncementsView({ remote }) {
               </div>
 
               <select
+                aria-label="Announcement month"
                 value={selectedMonth}
                 onChange={(event) =>
                   setSelectedMonth(event.target.value)
@@ -260,35 +231,26 @@ export function AnnouncementsView({ remote }) {
                 ))}
               </select>
 
-              <div role="group" aria-label="Announcement year" className="flex h-11 shrink-0 items-center rounded-xl border border-gray-200 bg-white">
-                <button type="button" aria-label="Previous year" onClick={() => setSelectedYear((year) => String((year === 'all' ? currentYear : Number(year)) - 1))}
-                  className="flex h-full w-11 items-center justify-center rounded-l-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
-                  <ChevronDown size={18} aria-hidden="true" />
-                </button>
-                <button type="button" aria-label="All years" aria-pressed={selectedYear === 'all'} title="All Years" onClick={() => setSelectedYear('all')}
-                  className="h-full w-24 text-center text-sm font-semibold tabular-nums text-gray-700 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
-                  {selectedYear === 'all' ? 'All Years' : selectedYear}
-                </button>
-                <button type="button" aria-label="Next year" onClick={() => setSelectedYear((year) => String((year === 'all' ? currentYear : Number(year)) + 1))}
-                  className="flex h-full w-11 items-center justify-center rounded-r-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
-                  <ChevronUp size={18} aria-hidden="true" />
-                </button>
-              </div>
+              <select aria-label="Announcement year" value={selectedYear} onChange={(event) => setSelectedYear(event.target.value)}
+                className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600">
+                <option value="all">All Years</option>
+                {years.map((year) => <option key={year} value={year}>{year}</option>)}
+              </select>
 
               <button
                 type="button"
                 onClick={clearFilters}
                 className="h-11 rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-500 hover:bg-gray-50"
               >
-                Clear
+                Clear Filters
               </button>
             </div>
 
             {loading && <PageSkeleton />}
             {error && <ErrorState description={error} onRetry={model.load} />}
             {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[950px] text-left">
+            <div ref={tableRef} tabIndex={-1} aria-label="Announcements table" className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-[#b7192e]">
+              <table className="w-full min-w-[720px] text-left">
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="px-6 py-4 text-xs font-semibold uppercase text-gray-400">
@@ -311,9 +273,6 @@ export function AnnouncementsView({ remote }) {
                       Status
                     </th>
 
-                    <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-gray-400">
-                      Actions
-                    </th>
                   </tr>
                 </thead>
 
@@ -321,7 +280,21 @@ export function AnnouncementsView({ remote }) {
                   {!loading && filteredAnnouncements.map((announcement) => (
                     <tr
                       key={announcement.id}
-                      className="border-b border-gray-100 last:border-0"
+                      tabIndex={0}
+                      aria-label={`View announcement: ${announcement.title}`}
+                      aria-haspopup="dialog"
+                      onClick={(event) => {
+                        if (event.target.closest('button, a, input, select, textarea, [contenteditable="true"]')) return;
+                        openAnnouncement(announcement.id, event.currentTarget);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget || event.repeat) return;
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          openAnnouncement(announcement.id, event.currentTarget);
+                        }
+                      }}
+                      className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#b7192e] last:border-0"
                     >
                       <td className="px-6 py-5">
                         <div className="font-semibold text-gray-800">
@@ -368,65 +341,6 @@ export function AnnouncementsView({ remote }) {
                             : 'Deleted'}
                         </span>
                       </td>
-
-                      <td className="px-6 py-5">
-                        <div className="flex justify-end gap-1">
-                          <button
-                            type="button"
-                            title="View announcement"
-                            onClick={() =>
-                              navigate(
-                                `/announcements/${announcement.id}`
-                              )
-                            }
-                            className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                          >
-                            <Eye size={17} />
-                          </button>
-
-                          {announcement.status !== 'deleted' && (
-                            <>
-                              <button
-                                type="button"
-                                title="Edit announcement"
-                                onClick={() =>
-                                  navigate(
-                                    `/announcements/${announcement.id}/edit`
-                                  )
-                                }
-                                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-[#b7192e]"
-                              >
-                                <Pencil size={17} />
-                              </button>
-
-                              <button
-                                type="button"
-                                disabled={busy}
-                                title="Delete announcement"
-                                onClick={() =>
-                                  handleDelete(announcement.id)
-                                }
-                                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600"
-                              >
-                                <Trash2 size={17} />
-                              </button>
-                            </>
-                          )}
-
-                          {announcement.status === 'deleted' && (
-                            <button
-                              type="button"
-                              disabled={busy || !isRecoverable(announcement)} title={isRecoverable(announcement) ? 'Restore' : 'Recovery period ended; awaiting backend purge'}
-                              onClick={() =>
-                                handleRestore(announcement.id)
-                              }
-                              className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-green-50 hover:text-green-600"
-                            >
-                              <RotateCcw size={17} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -439,6 +353,12 @@ export function AnnouncementsView({ remote }) {
           </section>
         </div>
       </main>
+      {selectedId !== null && <AnnouncementPopup key={selectedId} id={selectedId} onClose={() => setSelectedId(null)}
+        onEdit={() => formNavigation(`/announcements/${selectedId}/edit`)}
+        onChanged={() => {
+          void model.load();
+          requestAnimationFrame(() => tableRef.current?.focus({ preventScroll: true }));
+        }} />}
     </div>
   );
 }

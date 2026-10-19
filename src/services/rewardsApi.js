@@ -74,6 +74,24 @@ export function createRewards(requestAdmin, id, api = rewardsApi) {
         return false;
       }
     },
+    async refreshClaims() {
+      if (id) return false;
+      const current = version;
+      const currentAnalytics = ++analyticsVersion;
+      try {
+        const result = await requestAdmin(async (token) => {
+          const [redemptions, analytics] = await Promise.all([api.redemptions(token), api.analytics(token, state.year)]);
+          return { redemptions, analytics };
+        });
+        if (current !== version) return false;
+        if (currentAnalytics !== analyticsVersion) delete result.analytics;
+        update({ ...result, error: '', ...(currentAnalytics === analyticsVersion ? { analyticsLoading: false, analyticsError: '' } : {}) });
+        return true;
+      } catch (error) {
+        if (current === version) update({ error: `Claim saved, but Rewards data could not be refreshed. ${message(error)}`, ...(currentAnalytics === analyticsVersion ? { analyticsLoading: false } : {}) });
+        return false;
+      }
+    },
     async save(data) {
       if (state.busy) return false;
       const error = validateReward(data);

@@ -3,6 +3,7 @@ import RequireRole from './auth/RequireRole';
 import { ADMIN_ROLES } from './auth/roles';
 
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
 import ChangeInitialPassword from './pages/ChangeInitialPassword';
 import Dashboard from './pages/Dashboard';
 import Announcements from './pages/Announcements';
@@ -23,6 +24,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route element={<RequireRole initialPassword />}>
         <Route path="/change-initial-password" element={<ChangeInitialPassword />} />
       </Route>

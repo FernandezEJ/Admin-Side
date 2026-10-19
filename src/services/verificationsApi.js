@@ -33,7 +33,7 @@ export function createVerifications(requestAdmin, id, api = verificationsApi, ur
     subscribe(notify) { listeners.add(notify); return () => listeners.delete(notify); },
     async load() {
       const current = ++version;
-      clearProof(); update({ loading: true, error: '' });
+      clearProof(); update({ loading: true, error: '', ...(id ? { item: null } : {}) });
       try {
         const value = await requestAdmin((token) => id ? api.detail(token, id) : api.list(token));
         if (current === version) update({ ...(id ? { item: value } : { items: value }), loading: false });
@@ -49,22 +49,27 @@ export function createVerifications(requestAdmin, id, api = verificationsApi, ur
       } catch (error) { if (current === version) update({ proofLoading: false, proofError: error.message }); }
     },
     async review(action, reason = '') {
-      if (state.busy || state.item?.status !== 'for_verification') return false;
+      if (state.busy || state.loading || state.item?.status !== 'for_verification' || !['approve', 'needs-revision', 'reject'].includes(action) || state.item.proof?.version?.length !== 64) return false;
       if (action !== 'approve' && !reason.trim()) { update({ error: 'Enter a reason.' }); return false; }
-      const current = version;
+      let current = version;
       update({ busy: true, error: '' });
       try {
         const item = await requestAdmin((token) => api.review(token, id, action, state.item.proof?.version, reason.trim()));
         if (current !== version) return false;
+        if (!item || String(item.id) !== String(id) || item.status !== ({ approve: 'completed', 'needs-revision': 'needs_revision', reject: 'rejected' })[action]) throw new Error('The server returned an incomplete verification response. Refresh and try again.');
         update({ item });
         return true;
       } catch (error) {
         if (current === version) {
-          if (error.status === 409) await model.load();
-          update({ error: Object.values(error.errors ?? {}).flat().join(' ') || error.message });
+          if (error.status === 409) {
+            const refresh = model.load();
+            current = version;
+            await refresh;
+          }
+          if (current === version) update({ error: Object.values(error.errors ?? {}).flat().join(' ') || error.message });
         }
         return false;
-      } finally { update({ busy: false }); }
+      } finally { if (current === version) update({ busy: false }); }
     },
     dispose() { version++; clearProof(); },
   };

@@ -1,6 +1,5 @@
 import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useRef, useState } from 'react';
 
 import {
   Search,
@@ -8,7 +7,6 @@ import {
   CircleCheck,
   CircleX,
   Eye,
-
   RotateCcw,
   ArrowRight,
   ChevronDown,
@@ -20,6 +18,7 @@ import Header from '../components/layout/Header';
 
 import { useVerifications } from '../services/useVerifications';
 import { filterVerifications, VERIFICATION_STATUS_LABELS } from '../services/verificationsApi';
+import VerificationReviewDrawer from '../components/verification/VerificationReviewDrawer';
 
 const statusAppearance = {
   for_verification: { icon: Clock3, className: 'bg-amber-50 text-amber-600' },
@@ -35,7 +34,12 @@ function Verification() {
 
 export function VerificationView({ remote }) {
   const { items: verificationRequests, loading, error, model } = remote;
-  const navigate = useNavigate();
+  const [selectedId, setSelectedId] = useState(null);
+  const tableFocusRef = useRef(null);
+  const openReview = (id, target) => {
+    target.focus({ preventScroll: true });
+    setSelectedId(id);
+  };
 
   // ============================================================
   // Filters
@@ -278,7 +282,7 @@ export function VerificationView({ remote }) {
                 ================================================== */}
             {loading && <PageSkeleton />}
             {error && <ErrorState description={error} onRetry={model.load} />}
-            <div className="w-full overflow-x-auto">
+            <div ref={tableFocusRef} tabIndex={-1} aria-label="Verification records" className="w-full overflow-x-auto">
               <table className="w-full min-w-[640px] table-fixed text-left">
                 <thead>
                   <tr className="border-b border-gray-100">
@@ -286,11 +290,11 @@ export function VerificationView({ remote }) {
                       Donor
                     </th>
 
-                    <th className="w-[12%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <th className="w-[10%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
                       Blood Type
                     </th>
 
-                    <th className="w-[28%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <th className="w-[24%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
                       Donation Event
                     </th>
 
@@ -301,10 +305,7 @@ export function VerificationView({ remote }) {
                     <th className="w-[14%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
                       Status
                     </th>
-
-                    <th className="w-[8%] px-4 py-4 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">
-                      Actions
-                    </th>
+                    <th className="w-[14%] px-2 py-4 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Actions</th>
                   </tr>
                 </thead>
 
@@ -312,7 +313,18 @@ export function VerificationView({ remote }) {
                   {!loading && !error && filteredRequests.map((request) => (
                     <tr
                       key={request.id}
-                      className="border-b border-gray-100 last:border-0"
+                      tabIndex={0}
+                      aria-label={`Review verification for ${request.donor}, ${VERIFICATION_STATUS_LABELS[request.status]}`}
+                      aria-haspopup="dialog"
+                      onClick={(event) => {
+                        if (event.target.closest('button, a, input, select, textarea')) return;
+                        openReview(request.id, event.currentTarget);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
+                        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openReview(request.id, event.currentTarget); }
+                      }}
+                      className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#b7192e] last:border-0"
                     >
                       <td className="break-words px-4 py-5">
                         <p className="font-semibold text-gray-800">
@@ -337,22 +349,12 @@ export function VerificationView({ remote }) {
                       <td className="px-4 py-5">
                         {renderStatus(request.status)}
                       </td>
-
-                      <td className="px-4 py-5">
-                        <div className="flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              navigate(
-                                `/verification/${request.id}`
-                              )
-                            }
-                            className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 transition hover:border-red-100 hover:bg-red-50 hover:text-[#b7192e]"
-                          >
-                            <Eye size={15} />
-                            View
-                          </button>
-                        </div>
+                      <td className="px-2 py-5 text-right">
+                        <button type="button" aria-label={`View verification for ${request.donor}`} aria-haspopup="dialog"
+                          onClick={(event) => { event.stopPropagation(); openReview(request.id, event.currentTarget); }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2 py-2 text-xs font-semibold text-gray-600 transition hover:border-red-100 hover:bg-red-50 hover:text-[#b7192e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
+                          <Eye size={14} aria-hidden="true" />View
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -367,6 +369,8 @@ export function VerificationView({ remote }) {
           </section>
         </div>
       </main>
+      {selectedId !== null && <VerificationReviewDrawer key={selectedId} id={selectedId} fallbackFocusRef={tableFocusRef}
+        onClose={() => setSelectedId(null)} onDecision={() => { setSelectedId(null); void model.load(); }} />}
     </div>
   );
 }

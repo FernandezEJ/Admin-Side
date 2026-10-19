@@ -2,13 +2,17 @@ import { useAnnouncements } from '../services/useAnnouncements';
 import { ErrorState, PageSkeleton } from '../components/ui/PageState';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ImagePlus } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
+import AnnouncementEditor from '../components/announcements/AnnouncementEditor';
+import { announcementContentError, announcementDocument, documentText } from '../services/announcementContent';
 
 function CreateAnnouncement() {
   const navigate = useNavigate();
+  const { state } = useLocation();
+  const returnToList = () => navigate('/announcements', { state: { announcementFilters: state?.announcementFilters } });
   const { id } = useParams();
   const { item, loading, busy, error, model } = useAnnouncements(id || 'create');
 
@@ -17,6 +21,7 @@ function CreateAnnouncement() {
   // ============================================================
 
   const [changes, setFormData] = useState(null);
+  const [descriptionSubmitted, setDescriptionSubmitted] = useState(false);
   const formData = changes ?? item ?? {
     title: '',
     description: '',
@@ -49,7 +54,9 @@ function CreateAnnouncement() {
   };
 
   const save = async (status) => {
-    if (await model.save(formData, image, status)) navigate('/announcements');
+    setDescriptionSubmitted(true);
+    if (announcementContentError(formData.description_document ?? announcementDocument(formData), true)) return;
+    if (await model.save(formData, image, status)) returnToList();
   };
   const handleSaveDraft = () => save('draft');
   const handlePublish = (event) => { event.preventDefault(); void save('published'); };
@@ -68,7 +75,7 @@ function CreateAnnouncement() {
           <div className="mx-auto max-w-5xl">
             <button
               type="button"
-              onClick={() => navigate('/announcements')}
+              onClick={returnToList}
               className="mb-5 flex items-center gap-2 text-sm font-semibold text-gray-500 transition hover:text-[#b7192e]"
             >
               <ArrowLeft size={17} />
@@ -121,16 +128,8 @@ function CreateAnnouncement() {
                       Description
                     </label>
 
-                    <textarea
-                      id="description"
-                      name="description"
-                      value={formData.description}
-                      onChange={handleChange}
-                      placeholder="Enter announcement description"
-                      required
-                      rows={7}
-                      className="w-full resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-[#b7192e] focus:ring-2 focus:ring-red-100"
-                    />
+                    <AnnouncementEditor value={formData.description_document ?? announcementDocument(formData)} disabled={busy || item?.status === 'deleted'} submitted={descriptionSubmitted}
+                      onChange={(document) => setFormData({ ...formData, description_document: document, description: documentText(document) })} />
                   </div>
 
                   <div>
@@ -257,7 +256,7 @@ function CreateAnnouncement() {
               <div className="mt-8 flex flex-wrap justify-end gap-3 border-t border-gray-100 pt-6">
                 <button
                   type="button"
-                  onClick={() => navigate('/announcements')}
+                  onClick={returnToList}
                   className="min-h-11 rounded-xl border border-gray-300 px-5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
                 >
                   Cancel

@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
+import { readFileSync } from 'node:fs';
 
 export async function checkVerifications(server) {
   const { createVerifications, filterVerifications, verificationRow, VERIFICATION_STATUS_LABELS } = await server.ssrLoadModule('/src/services/verificationsApi.js');
   const { VerificationView } = await server.ssrLoadModule('/src/pages/Verification.jsx');
   const { VerificationDetailView } = await server.ssrLoadModule('/src/pages/VerificationDetail.jsx');
+  const { default: VerificationReviewDrawer, VerificationReviewPanel, VerificationProofViewer } = await server.ssrLoadModule('/src/components/verification/VerificationReviewDrawer.jsx');
   const { AdminSessionContext } = await server.ssrLoadModule('/src/auth/useAdminSession.js');
   const render = (Component, remote) => renderToString(React.createElement(MemoryRouter, null,
     React.createElement(AdminSessionContext.Provider, { value: { role: 'admin', currentAdmin: { name: 'Reviewer' } } },
@@ -172,7 +174,8 @@ export async function checkVerifications(server) {
     assert.ok(render(VerificationView, { ...list.getSnapshot(), model: list }).includes('Loading page'));
     await list.load();
     let html = render(VerificationView, { ...list.getSnapshot(), model: list });
-    for (const label of ['For Verification', 'Need Revision', 'Completed', 'Rejected', 'View']) assert.ok(html.includes(label));
+    for (const label of ['For Verification', 'Need Revision', 'Completed', 'Rejected']) assert.ok(html.includes(label));
+    assert.ok(html.includes('View') && html.includes('Actions'));
     assert.ok(!html.includes('Pending') && !html.includes('Unsubmitted Donor') && !html.includes('value="2024"'));
     assert.equal(list.getSnapshot().items.find((item) => item.id === unsubmitted.id).status, 'pending', 'Backend Pending lifecycle data is preserved');
     assert.ok(!html.includes('<script>Donor</script>'));
@@ -224,6 +227,136 @@ export async function checkVerifications(server) {
     records = []; await list.load();
     assert.ok(render(VerificationView, { ...list.getSnapshot(), model: list }).includes('No verification records found'));
     assert.ok(calls.some(({ path }) => path.endsWith('/needs-revision')));
-    console.log('Verification checks passed: four-card/tab shortcuts for both roles, Pending hidden from UI and retained in fetched lifecycle data, distinct counts, preserved search/date filters, arrows/selected state, no shortcut API calls, private image/PDF, URL cleanup, decisions, duplicate/stale reviews, state movement and loading/error/empty rendering.');
+    // Rows open a panel in place. Closing and successful decisions keep filters;
+    // only a successful decision requests a fresh list/status-card snapshot.
+    for (const key of ['click', 'Enter', ' ', 'View']) {
+      let phase = 0, refreshes = 0, focuses = 0, prevented = 0, stopped = 0;
+      const checked = { items: [verificationRow({ ...record, status: 'for_verification', donor: { ...record.donor, name: 'Matching drawer donor' } })], loading: false, error: '', model: { load() { refreshes++; } } };
+      function ExerciseRow() {
+        const view = VerificationView({ remote: checked });
+        const nodes = descendants(view);
+        const search = nodes.find((node) => node.type === 'input');
+        const drawer = nodes.find((node) => node.type === VerificationReviewDrawer);
+        const rows = nodes.filter((node) => node.type === 'tr' && node.props.tabIndex === 0);
+        assert.equal(nodes.filter((node) => node.type === 'th').length, 6);
+        assert.equal(nodes.filter((node) => node.type === VerificationReviewDrawer).length, drawer ? 1 : 0);
+        if (phase === 0) { phase++; search.props.onChange({ target: { value: 'Matching' } }); }
+        else if (phase === 1) {
+          phase++; const row = rows[0];
+          assert.equal(row.props['aria-haspopup'], 'dialog'); assert.match(row.props['aria-label'], /Matching drawer donor/);
+          const viewButton = descendants(row).find((node) => node.type === 'button');
+          assert.match(viewButton.props['aria-label'], /View verification for Matching/);
+          assert.equal(viewButton.props.type, 'button'); assert.equal(viewButton.props['aria-haspopup'], 'dialog');
+          const rowTarget = { focus() { focuses++; }, closest() { return null; } };
+          const buttonTarget = { focus() { focuses++; }, closest() { return viewButton; } };
+          // Bubbled button keyboard/click events must not activate the row.
+          row.props.onKeyDown({ key: 'Enter', target: buttonTarget, currentTarget: rowTarget, preventDefault() { assert.fail('Do not cancel native button keyboard activation'); } });
+          row.props.onKeyDown({ key: ' ', target: buttonTarget, currentTarget: rowTarget, preventDefault() { assert.fail('Do not cancel native button keyboard activation'); } });
+          row.props.onClick({ target: buttonTarget, currentTarget: rowTarget }); assert.equal(focuses, 0);
+          const event = { key, target: rowTarget, currentTarget: rowTarget, preventDefault() { prevented++; } };
+          if (key === 'click') row.props.onClick(event);
+          else if (key === 'View') viewButton.props.onClick({ currentTarget: buttonTarget, stopPropagation() { stopped++; } });
+          else row.props.onKeyDown(event);
+        } else if (phase === 2) { phase++; assert.equal(drawer.props.id, 9); assert.equal(search.props.value, 'Matching'); drawer.props.onClose(); }
+        else if (phase === 3) { phase++; assert.ok(!drawer); assert.equal(refreshes, 0); rows[0].props.onClick({ target: { closest() { return null; } }, currentTarget: { focus() {} } }); }
+        else if (phase === 4) { phase++; drawer.props.onDecision(); }
+        else { assert.ok(!drawer); assert.equal(refreshes, 1); assert.equal(search.props.value, 'Matching'); }
+        return view;
+      }
+      renderToString(React.createElement(MemoryRouter, null, React.createElement(AdminSessionContext.Provider,
+        { value: { role: 'admin', currentAdmin: { name: 'Reviewer' } } }, React.createElement(ExerciseRow))));
+      assert.equal(focuses, 1); assert.equal(prevented, ['click', 'View'].includes(key) ? 0 : 1); assert.equal(stopped, key === 'View' ? 1 : 0);
+    }
+    const submitted = { ...record, status: 'for_verification', revision_reason: null, rejection_reason: null, completion: null };
+    const drawerRemote = { item: submitted, loading: false, busy: false, error: '', proofUrl: 'blob:secure-proof', proofType: 'image/png', proofLoading: false, proofError: '', model: { openProof() {}, load() {} } };
+    html = renderToString(React.createElement(VerificationReviewPanel, { remote: drawerRemote, onClose() {}, onDecision() {} }));
+    for (const label of ['Verification Review', 'Donor Information', 'Donation Information', 'Submitted Proof', 'Real API Drive', 'Dagupan', 'certificate.png', 'Rotate proof', 'Zoom proof', 'Needs Revision', 'Reject Permanently', 'Approve']) assert.ok(html.includes(label), label);
+    assert.ok(!html.includes('Confirm arrangements') && !html.includes('/storage/'));
+    assert.ok(html.indexOf('Submitted Proof') < html.indexOf('Donor Information') && html.indexOf('Donor Information') < html.indexOf('Donation Information'));
+    assert.ok(html.includes('verification-review-modal') && html.includes('verification-review-grid') && html.includes('verification-review-information'));
+    assert.ok(html.indexOf('Needs Revision') < html.indexOf('Reject Permanently') && html.indexOf('Reject Permanently') < html.indexOf('Approve'));
+    for (const status of ['completed', 'rejected', 'needs_revision', 'pending']) {
+      const page = renderToString(React.createElement(VerificationReviewPanel, { remote: { ...drawerRemote, item: { ...submitted, status } }, onClose() {} }));
+      assert.ok(!page.includes('verification-decision-approve') && !page.includes('verification-decision-reject'));
+      assert.ok(page.includes('read-only') || page.includes('Waiting for replacement'));
+    }
+    const absent = renderToString(React.createElement(VerificationReviewPanel, { remote: { ...drawerRemote, item: { ...submitted, donor: null, opportunity: null, proof: null }, proofUrl: '' }, onClose() {} }));
+    assert.ok(absent.includes('Unavailable donor') && absent.includes('No proof has been submitted') && !absent.includes('Confirm arrangements'));
+    for (const action of ['approve', 'needs-revision', 'reject']) {
+      let phase = 0, form, panel, posted = 0, decision = 0, finish;
+      const checkedRemote = { ...drawerRemote, model: { ...drawerRemote.model, getSnapshot: () => ({ item: submitted }), review: (receivedAction, reason) => {
+        posted++; assert.equal(receivedAction, action); if (action !== 'approve') assert.equal(reason, 'Clearer proof required');
+        return new Promise((resolve) => { finish = resolve; });
+      } } };
+      function ExerciseConfirmation() {
+        panel = VerificationReviewPanel({ remote: checkedRemote, onClose() {}, onDecision() { decision++; } });
+        const nodes = descendants(panel);
+        if (phase === 0) {
+          phase++;
+          nodes.find((node) => node.type === 'button' && node.props.className === `verification-decision-${action === 'approve' ? 'approve' : action === 'reject' ? 'reject' : 'revision'}`).props.onClick();
+        } else if (phase === 1 && action !== 'approve') {
+          phase++; nodes.find((node) => node.type === 'textarea').props.onChange({ target: { value: 'Clearer proof required' } });
+        } else {
+          form = nodes.find((node) => node.type === 'form');
+          assert.ok(form); assert.equal(panel.props.locked, true);
+          if (action !== 'approve') assert.equal(nodes.find((node) => node.type === 'textarea').props.required, true);
+        }
+        return panel;
+      }
+      renderToString(React.createElement(ExerciseConfirmation));
+      assert.equal(posted, 0, 'Opening the confirmation does not submit');
+      const first = form.props.onSubmit({ preventDefault() {} });
+      await form.props.onSubmit({ preventDefault() {} }); assert.equal(posted, 1); assert.equal(decision, 0);
+      finish(false); await first; assert.equal(decision, 0, 'Failed decisions keep the panel open');
+      const retry = form.props.onSubmit({ preventDefault() {} }); finish(true); await retry; assert.equal(decision, 1);
+    }
+    // Zoom/rotate affect only the private image view, never its URL or backend.
+    let proofPhase = 0;
+    function ExerciseProof() {
+      const view = VerificationProofViewer({ url: 'blob:secure-proof', type: 'image/png', name: 'proof.png' });
+      const nodes = descendants(view), image = nodes.find((node) => node.type === 'img');
+      if (proofPhase === 0) { proofPhase++; image.props.onLoad({ currentTarget: { naturalWidth: 600, naturalHeight: 900 } }); }
+      else if (proofPhase === 1) { proofPhase++; nodes.find((node) => node.props['aria-label'] === 'Rotate proof').props.onClick(); }
+      else if (proofPhase === 2) { proofPhase++; nodes.find((node) => node.props['aria-label'] === 'Zoom proof').props.onClick(); }
+      else { assert.ok(image.props.style.transform.includes('90deg')); assert.equal(image.props.src, 'blob:secure-proof'); assert.equal(nodes.find((node) => node.props.className === 'verification-proof-stage').props.style.width, '150%'); }
+      return view;
+    }
+    renderToString(React.createElement(ExerciseProof));
+    const pdf = renderToString(React.createElement(VerificationProofViewer, { url: 'blob:pdf-proof', type: 'application/pdf', name: 'proof.pdf' }));
+    assert.ok(pdf.includes('<iframe') && pdf.includes('Open PDF') && pdf.includes('noopener noreferrer'));
+    // In-flight detail, proof and review requests are discarded after close/switch.
+    let finishDetail, finishProof, finishReview;
+    const raceUrls = { created: [], revoked: [], createObjectURL() { this.created.push('blob:race'); return 'blob:race'; }, revokeObjectURL(url) { this.revoked.push(url); } };
+    const delayedApi = { detail: async () => submitted, proof: () => new Promise((resolve) => { finishProof = resolve; }), review: () => new Promise((resolve) => { finishReview = resolve; }) };
+    const race = createVerifications(run, '9', delayedApi, raceUrls); await race.load();
+    const proofRequest = race.openProof(); race.dispose(); finishProof(new Blob(['bytes'], { type: 'image/png' })); await proofRequest;
+    assert.equal(raceUrls.created.length, 0); assert.equal(race.getSnapshot().proofUrl, '');
+    await race.load(); const reviewRequest = race.review('approve'); race.dispose(); const afterClose = race.getSnapshot();
+    finishReview({ ...submitted, status: 'completed' }); assert.equal(await reviewRequest, false); assert.equal(race.getSnapshot(), afterClose);
+    delayedApi.detail = () => new Promise((resolve) => { finishDetail = resolve; });
+    const detailRequest = race.load(); race.dispose(); const afterSwitch = race.getSnapshot(); finishDetail(submitted); await detailRequest;
+    assert.equal(race.getSnapshot(), afterSwitch);
+    // Failed conflict refresh must remove the old proof/version and prevent review.
+    let detailReads = 0;
+    const conflict = createVerifications(run, '9', { detail: async () => { if (++detailReads > 1) throw new Error('Offline'); return submitted; },
+      review: async () => { throw Object.assign(new Error('The proof changed. Refresh.'), { status: 409 }); } }, raceUrls);
+    await conflict.load(); assert.equal(await conflict.review('approve'), false);
+    assert.equal(conflict.getSnapshot().item, null); assert.equal(await conflict.review('approve'), false);
+    for (const status of [401, 403, 422, 429, 503, 0]) {
+      const failedReview = createVerifications(run, '9', { detail: async () => submitted,
+        review: async () => { throw Object.assign(new Error(status ? `Review failed (${status})` : 'Offline'), { status, ...(status === 422 ? { errors: { reason: ['Check the reason.'] } } : {}) }); } }, raceUrls);
+      await failedReview.load();
+      assert.equal(await failedReview.review('approve'), false);
+      assert.equal(failedReview.getSnapshot().item, submitted, 'An unsuccessful decision retains the current record');
+      assert.equal(failedReview.getSnapshot().busy, false);
+      assert.match(failedReview.getSnapshot().error, status === 422 ? /Check the reason/ : status ? /Review failed/ : /Offline/);
+      failedReview.dispose();
+    }
+    const partialReview = createVerifications(run, '9', { detail: async () => submitted, review: async () => ({}) }, raceUrls);
+    await partialReview.load(); assert.equal(await partialReview.review('approve'), false); assert.match(partialReview.getSnapshot().error, /incomplete/);
+    const css = readFileSync('src/styles/verification-review.css', 'utf8');
+    for (const value of ['width: min(1080px, calc(100vw - 48px))', 'margin: auto', 'inset: 0;', 'grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr)', 'overflow-y: auto', '::backdrop', '.verification-review-footer', 'flex: none', '@media (max-width: 720px)', '@media (max-width: 479px)']) assert.ok(css.includes(value), value);
+    assert.ok(!css.includes('inset: 0 0 0 auto') && !css.includes('clamp(354px'));
+    console.log('Verification checks passed: preserved cards/filters/roles/deep links; six-column table with View and clickable keyboard rows sharing one popup; button propagation/keyboard guards; centered two-column proof-left/info-right modal with responsive footer; authenticated image/PDF, zoom/rotate and Blob cleanup; confirmations/reasons/duplicate guards; success close/list refresh, failures and stale-version recovery.');
   } finally { globalThis.fetch = originalFetch; }
 }

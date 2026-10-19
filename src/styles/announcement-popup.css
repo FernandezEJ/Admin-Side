@@ -1,0 +1,47 @@
+.announcement-popup > dialog {
+  width: calc(100vw - 32px);
+  max-width: 896px;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.announcement-popup > dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.announcement-popup > dialog > div:first-child {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.announcement-popup-content {
+  min-height: 0;
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.announcement-popup-footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.announcement-popup .announcement-details { border: 0; border-radius: 0; }
+.announcement-popup .announcement-image { height: auto; max-height: 160px; background: transparent; }
+.announcement-popup .announcement-image img { max-height: 160px; width: 100%; object-fit: contain; }
+.announcement-popup .announcement-copy { padding: 0; }
+.announcement-popup .announcement-image + .announcement-copy { margin-top: 12px; }
+.announcement-popup .announcement-title { margin-top: 12px; font-size: 20px; line-height: 1.4; overflow-wrap: anywhere; }
+.announcement-popup .announcement-location { margin-top: 8px; overflow-wrap: anywhere; }
+.announcement-popup .announcement-description { margin-top: 12px; font-size: 14px; }
+.announcement-popup .announcement-dates { margin-top: 16px; padding-top: 12px; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.announcement-popup .announcement-dates p { overflow-wrap: anywhere; }
