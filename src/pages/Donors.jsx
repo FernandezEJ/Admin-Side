@@ -1,3 +1,4 @@
+import { formatDonorName } from '../services/staffNames';
 import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
 
 
@@ -22,19 +23,19 @@ export function DonorsView({ remote }) {
   const getAchievementClasses = (achievement) => {
   switch (achievement) {
     case 'Bronze Donor':
-      return 'bg-amber-100 text-amber-800';
+      return 'bg-warning-surface text-warning-foreground';
 
     case 'Silver Donor':
       return 'bg-gray-200 text-gray-700';
 
     case 'Gold Donor':
-      return 'bg-yellow-100 text-yellow-700';
+      return 'bg-warning-surface text-warning-foreground';
 
     case 'First-Time Donor':
-      return 'bg-red-50 text-[#b7192e]';
+      return 'bg-selected text-primary';
 
     default:
-      return 'bg-gray-100 text-gray-600';
+      return 'bg-neutral-surface text-neutral-foreground';
   }
 };
 
@@ -74,28 +75,28 @@ export function DonorsView({ remote }) {
   const renderEligibility = (eligibility) => {
     if (eligibility === 'eligible') {
       return (
-        <span className="inline-flex rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
+        <span className="inline-flex rounded-full bg-success-surface px-3 py-1.5 text-xs font-semibold text-success-foreground">
           Eligible
         </span>
       );
     }
 
     if (eligibility === 'unassessed') {
-      return <span className="inline-flex rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600">Not Assessed</span>;
+      return <span className="inline-flex rounded-full bg-neutral-surface px-3 py-1.5 text-xs font-semibold text-neutral-foreground">Not Assessed</span>;
     }
     if (eligibility !== 'temporarily_ineligible') {
-      return <span className="inline-flex rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">Needs Screening</span>;
+      return <span className="inline-flex rounded-full bg-warning-surface px-3 py-1.5 text-xs font-semibold text-warning-foreground">Needs Screening</span>;
     }
 
     return (
-      <span className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-[#b7192e]">
+      <span className="inline-flex rounded-full bg-warning-surface px-3 py-1.5 text-xs font-semibold text-warning-foreground">
         Temporarily Ineligible
       </span>
     );
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f7f8fa]">
+    <div className="flex min-h-screen bg-page">
       <Sidebar />
 
       <main className="min-w-0 flex-1">
@@ -137,7 +138,7 @@ export function DonorsView({ remote }) {
                   </h3>
                 </div>
 
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-[#b7192e]">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-selected text-primary">
                   <Users size={21} />
                 </div>
               </div>
@@ -155,7 +156,7 @@ export function DonorsView({ remote }) {
                   </h3>
                 </div>
 
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-600">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-success-surface text-success-foreground">
                   <CircleCheck size={21} />
                 </div>
               </div>
@@ -173,7 +174,7 @@ export function DonorsView({ remote }) {
                   </h3>
                 </div>
 
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-warning-surface text-warning-foreground">
                   <Clock3 size={21} />
                 </div>
               </div>
@@ -192,7 +193,7 @@ export function DonorsView({ remote }) {
                   onClick={() => setActiveTab('all')}
                   className={`border-b-2 pb-4 text-sm font-semibold transition ${
                     activeTab === 'all'
-                      ? 'border-[#b7192e] text-[#b7192e]'
+                      ? 'border-primary text-primary'
                       : 'border-transparent text-gray-400 hover:text-gray-700'
                   }`}
                 >
@@ -204,7 +205,7 @@ export function DonorsView({ remote }) {
                   onClick={() => setActiveTab('top')}
                   className={`flex items-center gap-2 border-b-2 pb-4 text-sm font-semibold transition ${
                     activeTab === 'top'
-                      ? 'border-[#b7192e] text-[#b7192e]'
+                      ? 'border-primary text-primary'
                       : 'border-transparent text-gray-400 hover:text-gray-700'
                   }`}
                 >
@@ -234,7 +235,7 @@ export function DonorsView({ remote }) {
                         setSearchTerm(event.target.value)
                       }
                       placeholder="Search donor or blood type..."
-                      className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-[#b7192e] focus:bg-white"
+                      className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-primary focus:bg-white"
                     />
                   </div>
 
@@ -243,7 +244,7 @@ export function DonorsView({ remote }) {
                     onChange={(event) =>
                       setSelectedBloodType(event.target.value)
                     }
-                    className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"
+                    className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-primary"
                   >
                     <option value="all">
                       All Blood Types
@@ -264,7 +265,7 @@ export function DonorsView({ remote }) {
                     onChange={(event) =>
                       setSelectedEligibility(event.target.value)
                     }
-                    className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"
+                    className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-primary"
                   >
                     <option value="all">
                       All Eligibility
@@ -329,7 +330,7 @@ export function DonorsView({ remote }) {
                         >
                           <td className="break-words px-5 py-5">
                             <p className="font-semibold text-gray-800">
-                              {donor.name}
+                              {formatDonorName(donor.name)}
                             </p>
 
                             <p className="mt-1 text-xs text-gray-400">
@@ -338,7 +339,7 @@ export function DonorsView({ remote }) {
                           </td>
 
                           <td className="px-3 py-5">
-                            <span className="inline-flex min-w-10 justify-center rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#b7192e]">
+                            <span className="inline-flex min-w-10 justify-center rounded-lg px-2.5 py-1.5 text-xs font-bold text-primary">
                               {donor.bloodType ?? 'Unknown'}
                             </span>
                           </td>
@@ -414,7 +415,7 @@ export function DonorsView({ remote }) {
                       {/* Donor */}
                       <div className="min-w-0">
                         <p className="truncate font-semibold text-gray-800">
-                            {donor.name}
+                            {formatDonorName(donor.name)}
                         </p>
 
                         <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -436,7 +437,7 @@ export function DonorsView({ remote }) {
 
                       {/* Donation count */}
                       <div className="text-right">
-                        <p className="text-lg font-bold text-[#b7192e]">
+                        <p className="text-lg font-bold text-primary">
                           {donor.totalDonations}
                         </p>
 

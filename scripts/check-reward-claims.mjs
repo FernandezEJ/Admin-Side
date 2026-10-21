@@ -40,6 +40,7 @@ export async function checkRewardClaims(server) {
   try {
     const model = createRewardClaims(run, () => { updates++; });
     assert.ok(render(model).includes('One-Time Claim Code'));
+    assert.ok(button(model, 'Verify Code').props.className.includes('bg-primary'));
     assert.equal(await model.verify(), false); assert.equal(calls.length, 0); assert.match(model.getSnapshot().error, /Enter/);
     model.setCode('bad'); assert.equal(await model.verify(), false); assert.equal(calls.length, 0);
     const form = nodes(tree(model)).find((node) => node.type === 'form');
@@ -56,10 +57,12 @@ export async function checkRewardClaims(server) {
     for (const label of ['Verification Result', 'Pending Claim', 'Saved jacket', 'Size Medium', 'LFW-7B9X2Q', 'Mark as Claimed', '&lt;b&gt;Verified donor&lt;/b&gt;']) assert.ok(html.includes(label), label);
     assert.ok(!html.includes('<b>Verified donor</b>'));
     assert.deepEqual(calls, ['verify'], 'Verification and opening the popup never confirm');
+    assert.ok(button(model, 'Mark as Claimed').props.className.includes('bg-success'));
     assert.equal(await model.confirm(), false, 'Cannot skip the final confirmation step');
     button(model, 'Mark as Claimed').props.onClick();
     assert.equal(model.getSnapshot().step, 'confirm');
     html = render(model); assert.ok(html.includes('Confirm that this reward has been handed over to the donor?'));
+    assert.ok(button(model, 'Confirm Claim').props.className.includes('bg-success'));
     assert.ok(html.includes('Saved jacket') && html.includes('Size Medium'), 'Verified details remain during confirmation');
     button(model, 'Cancel').props.onClick(); assert.equal(model.getSnapshot().step, 'result'); assert.deepEqual(calls, ['verify']);
     button(model, 'Mark as Claimed').props.onClick();

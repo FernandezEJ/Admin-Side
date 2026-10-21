@@ -7,11 +7,11 @@
 .announcement-rich-text > :is(p, div):is([data-empty-paragraph], :empty, :has(> br:only-child)) + :is(p, div, ul, ol) { margin-top: 0; }
 
 .announcement-editor:focus-within {
-  border-color: #6b7280;
-  box-shadow: 0 0 0 2px #e5e7eb;
+  border-color: var(--color-neutral);
+  box-shadow: 0 0 0 2px var(--color-line);
 }
 
 /* The frame supplies focus visibility; a second outline crosses the toolbar. */
 .announcement-editor [role="textbox"]:is(:focus, :focus-visible) { outline: none; }
-.announcement-editor[data-invalid="true"] { border-color: #b7192e; }
-.announcement-editor[data-invalid="true"]:focus-within { box-shadow: 0 0 0 2px #fee2e2; }
+.announcement-editor[data-invalid="true"] { border-color: var(--color-danger); }
+.announcement-editor[data-invalid="true"]:focus-within { box-shadow: 0 0 0 2px var(--color-danger-surface); }

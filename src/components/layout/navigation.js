@@ -14,4 +14,4 @@ export const navigationItems = [
   { name: 'System Reports', path: '/system-reports', icon: FileText, allowedRoles: [ADMIN_ROLES.SUPER_ADMIN] },
   { name: 'Admin Management', path: '/admin-management', icon: UserRoundCog, allowedRoles: [ADMIN_ROLES.SUPER_ADMIN] },
   { name: 'Audit Logs', path: '/audit-logs', icon: History, allowedRoles: [ADMIN_ROLES.SUPER_ADMIN] },
-];
+].map((item) => ({ ...item, section: item.allowedRoles.includes(ADMIN_ROLES.SUPER_ADMIN) ? 'SYSTEM' : 'MAIN MENU' }));

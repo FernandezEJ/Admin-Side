@@ -6,6 +6,6 @@ export default function SessionState() {
   if (isLoading) return <PageSkeleton />;
   return <div className="mx-auto max-w-lg p-6">
     <ErrorState title="Unable to restore your session" description={sessionError} onRetry={refreshSession} />
-    <button onClick={logout} className="mt-4 text-sm font-semibold text-[#b7192e]">Return to sign in</button>
+    <button onClick={logout} className="mt-4 text-sm font-semibold text-primary">Return to sign in</button>
   </div>;
 }

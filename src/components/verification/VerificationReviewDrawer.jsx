@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle2, MapPin, RotateCcw, UserRound, X, XCircle, ZoomIn } from 'lucide-react';
 import AdminDialog from '../ui/AdminDialog';
+import { formatDonorName } from '../../services/staffNames';
 import { useVerifications } from '../../services/useVerifications';
 import { VERIFICATION_STATUS_LABELS } from '../../services/verificationsApi';
 import '../../styles/verification-review.css';
@@ -128,7 +129,7 @@ export function VerificationReviewPanel({ remote, onClose, onDecision, fallbackF
         <section className="verification-review-card">
           <h3><UserRound size={14} aria-hidden="true" />Donor Information</h3>
           <dl>
-            <div className="verification-donor-name"><dt>Donor Name</dt><dd>{item.donor?.name || 'Unavailable donor'}</dd>
+            <div className="verification-donor-name"><dt>Donor Name</dt><dd>{formatDonorName(item.donor?.name) || 'Unavailable donor'}</dd>
               {item.donor?.email && <dd className="verification-donor-email">{item.donor.email}</dd>}</div>
             <div className="verification-donor-meta">
               <div><dt>Blood Type</dt><dd className="verification-donor-blood">{item.donor?.blood_type || 'Unknown'}</dd></div>
@@ -156,11 +157,11 @@ export function VerificationReviewPanel({ remote, onClose, onDecision, fallbackF
       <form onSubmit={submit}>
         <p className="text-sm leading-6 text-gray-600">{action === 'approve' ? 'Confirm this donation proof is valid. The donation will be completed and points awarded.' : action === 'needs-revision' ? 'Explain what the donor needs to correct. They can upload replacement proof.' : 'This is a final rejection. The donor cannot resubmit proof for this activity.'}</p>
         {action !== 'approve' && <label htmlFor={reasonId} className="mt-4 block text-sm font-semibold">Reason<textarea id={reasonId} required maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} rows={4} className="mt-2 w-full rounded-xl border border-gray-300 p-3" /></label>}
-        {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
-        {!canReview && <p role="alert" className="mt-3 text-sm text-amber-800">The record changed. Cancel and review its current details before continuing.</p>}
+        {error && <p role="alert" className="mt-3 text-sm text-danger-foreground">{error}</p>}
+        {!canReview && <p role="alert" className="mt-3 text-sm text-warning-foreground">The record changed. Cancel and review its current details before continuing.</p>}
         <div className="mt-6 flex justify-end gap-3">
           <button type="button" disabled={busy} onClick={closeConfirmation} className="min-h-11 rounded-xl border border-gray-200 px-5 text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button type="submit" disabled={busy || !canReview || (action !== 'approve' && !reason.trim())} className="min-h-11 rounded-xl bg-[#b7192e] px-5 text-sm font-semibold text-white transition hover:bg-[#9f1427] disabled:opacity-50">{busy ? 'Saving...' : 'Confirm'}</button>
+          <button type="submit" disabled={busy || !canReview || (action !== 'approve' && !reason.trim())} className={`min-h-11 rounded-xl px-5 text-sm font-semibold text-white transition disabled:opacity-50 ${action === 'approve' ? 'bg-success hover:bg-success-hover' : action === 'needs-revision' ? 'bg-warning hover:bg-warning-hover' : 'bg-danger hover:bg-danger-hover'}`}>{busy ? 'Saving...' : 'Confirm'}</button>
         </div>
       </form>
     </AdminDialog>}

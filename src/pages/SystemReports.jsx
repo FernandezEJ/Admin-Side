@@ -1,5 +1,6 @@
 import ReportChart from '../components/ReportChart';
 import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { formatDonorName } from '../services/staffNames';
 import {
   Printer,
   FileText,
@@ -82,7 +83,7 @@ export function SystemReportsView({ remote }) {
   };
 
   return (
-    <div className={`system-reports-page flex min-h-screen bg-[#f7f8fa]${printable ? '' : ' report-unavailable'}`}>
+    <div className={`system-reports-page flex min-h-screen bg-page${printable ? '' : ' report-unavailable'}`}>
       {/* Hidden when printing */}
       <div className="print:hidden">
         <Sidebar />
@@ -119,7 +120,7 @@ export function SystemReportsView({ remote }) {
                 onChange={(event) =>
                   model.setFilters({ month: event.target.value })
                 }
-                className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"
+                className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-primary"
               >
                 {months.map(([value, label]) => (
                   <option key={value} value={value}>
@@ -131,13 +132,13 @@ export function SystemReportsView({ remote }) {
               <div role="group" aria-label="Report year" className="flex h-11 shrink-0 items-center rounded-xl border border-gray-200 bg-white">
                 <button type="button" aria-label="Previous year" disabled={Number(selectedYear) <= 2000}
                   onClick={() => model.setFilters({ year: String(Number(selectedYear) - 1) })}
-                  className="flex h-full w-11 items-center justify-center rounded-l-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] disabled:cursor-not-allowed disabled:opacity-50">
+                  className="flex h-full w-11 items-center justify-center rounded-l-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">
                   <ChevronDown size={18} aria-hidden="true" />
                 </button>
                 <span className="w-16 text-center text-sm font-semibold tabular-nums text-gray-700">{selectedYear}</span>
                 <button type="button" aria-label="Next year" disabled={Number(selectedYear) >= currentYear + 1}
                   onClick={() => model.setFilters({ year: String(Number(selectedYear) + 1) })}
-                  className="flex h-full w-11 items-center justify-center rounded-r-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] disabled:cursor-not-allowed disabled:opacity-50">
+                  className="flex h-full w-11 items-center justify-center rounded-r-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">
                   <ChevronUp size={18} aria-hidden="true" />
                 </button>
               </div>
@@ -146,7 +147,7 @@ export function SystemReportsView({ remote }) {
                 type="button"
                 onClick={handlePrint}
                 disabled={!printable}
-                className="flex h-11 items-center gap-2 rounded-xl bg-[#b7192e] px-5 text-sm font-semibold text-white transition hover:bg-[#9f1427] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Printer size={17} />
                 Print / Save Report
@@ -173,7 +174,7 @@ export function SystemReportsView({ remote }) {
           >
             {/* Report Header */}
             <header className="border-b border-gray-200 pb-6 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-[#b7192e] print:hidden">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-selected text-primary print:hidden">
                 <FileText size={23} />
               </div>
 
@@ -343,7 +344,7 @@ export function SystemReportsView({ remote }) {
                       <Bar
                         isAnimationActive={false}
                         dataKey="donations"
-                        fill="#b7192e"
+                        fill="var(--color-primary)"
                         radius={[6, 6, 0, 0]}
                       />
                     </BarChart>
@@ -457,7 +458,7 @@ export function SystemReportsView({ remote }) {
                         className="border-t border-gray-100"
                       >
                         <td className="break-words px-4 py-4 font-semibold text-gray-800">
-                          {donation.donor}
+                          {formatDonorName(donation.donor)}
                         </td>
 
                         <td className="px-4 py-4 text-sm text-gray-600">
@@ -516,7 +517,7 @@ export function SystemReportsView({ remote }) {
                         className="border-t border-gray-100"
                       >
                         <td className="break-words px-4 py-4 font-semibold text-gray-800">
-                          {redemption.donor}
+                          {formatDonorName(redemption.donor)}
                         </td>
 
                         <td className="break-words px-4 py-4 text-sm text-gray-500">

@@ -99,7 +99,7 @@ export function AnnouncementsView({ remote }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f7f8fa]">
+    <div className="flex min-h-screen bg-page">
       <Sidebar />
 
       <main className="min-w-0 flex-1">
@@ -124,7 +124,7 @@ export function AnnouncementsView({ remote }) {
             <button
               type="button"
               onClick={() => formNavigation('/announcements/create')}
-              className="flex min-h-11 items-center gap-2 rounded-xl bg-[#b7192e] px-5 text-sm font-semibold text-white transition hover:bg-[#9f1427]"
+              className="flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary-hover"
             >
               <Plus size={18} />
               Create Announcement
@@ -164,9 +164,9 @@ export function AnnouncementsView({ remote }) {
                   onClick={() => setActiveTab(item.status)}
                   aria-label={`Show ${item.label} announcements`}
                   aria-pressed={activeTab === item.status}
-                  className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-red-200 hover:bg-red-50/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] ${
+                  className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-primary-border hover:bg-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                     activeTab === item.status
-                      ? 'border-red-200 bg-red-50/30'
+                      ? 'border-primary-border bg-selected'
                       : 'border-gray-200 bg-white'
                   }`}
                 >
@@ -182,7 +182,7 @@ export function AnnouncementsView({ remote }) {
                     </span>
 
                     <span className="flex shrink-0 items-center gap-2">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-[#b7192e]">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-selected text-primary">
                         <Icon size={21} aria-hidden="true" />
                       </span>
                       <ArrowRight size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
@@ -210,7 +210,7 @@ export function AnnouncementsView({ remote }) {
                     setSearchTerm(event.target.value)
                   }
                   placeholder="Search title or location..."
-                  className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm outline-none focus:border-[#b7192e] focus:bg-white"
+                  className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm outline-none focus:border-primary focus:bg-white"
                 />
               </div>
 
@@ -249,7 +249,7 @@ export function AnnouncementsView({ remote }) {
             {loading && <PageSkeleton />}
             {error && <ErrorState description={error} onRetry={model.load} />}
             {/* Table */}
-            <div ref={tableRef} tabIndex={-1} aria-label="Announcements table" className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-[#b7192e]">
+            <div ref={tableRef} tabIndex={-1} aria-label="Announcements table" className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-primary">
               <table className="w-full min-w-[720px] text-left">
                 <thead>
                   <tr className="border-b border-gray-100">
@@ -294,7 +294,7 @@ export function AnnouncementsView({ remote }) {
                           openAnnouncement(announcement.id, event.currentTarget);
                         }
                       }}
-                      className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#b7192e] last:border-0"
+                      className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary last:border-0"
                     >
                       <td className="px-6 py-5">
                         <div className="font-semibold text-gray-800">
@@ -324,12 +324,12 @@ export function AnnouncementsView({ remote }) {
                         <span
                           className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${
                             announcement.status === 'active'
-                              ? 'bg-green-50 text-green-700'
+                              ? 'bg-success-surface text-success-foreground'
                               : announcement.status === 'draft'
-                              ? 'bg-blue-50 text-blue-700'
+                              ? 'bg-neutral-surface text-neutral-foreground'
                               : announcement.status === 'expired'
-                              ? 'bg-gray-100 text-gray-600'
-                              : 'text-red-700'
+                              ? 'bg-neutral-surface text-neutral-foreground'
+                              : 'bg-danger-surface text-danger-foreground'
                           }`}
                         >
                           {announcement.status === 'active'

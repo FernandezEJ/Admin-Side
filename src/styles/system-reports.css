@@ -70,7 +70,7 @@
 
   #monthly-report {
     font-size: 10pt;
-    color: #111827;
+    color: var(--color-content);
   }
 
   #monthly-report section {
@@ -132,7 +132,7 @@
   }
 
   #monthly-report .text-gray-400 {
-    color: #4b5563;
+    color: var(--color-neutral);
   }
 }
 .report-print-chart { display: none; }

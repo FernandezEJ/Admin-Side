@@ -14,10 +14,46 @@ import { checkDashboard } from './check-dashboard.mjs';
 import { checkRewards } from './check-rewards.mjs';
 import { checkRewardClaims } from './check-reward-claims.mjs';
 import { checkDonors } from './check-donors.mjs';
+import { checkDonorNames } from './check-donor-names.mjs';
 import { checkAuditLogs } from './check-audit-logs.mjs';
 import { checkSystemReports } from './check-system-reports.mjs';
+import { checkSidebar } from './check-sidebar.mjs';
 
 const server = await createServer({ server: { middlewareMode: true } });
+// Palette checks stay in the existing runner; no browser or live API is simulated here.
+function checkColorPalette() {
+  const css = readFileSync('src/index.css', 'utf8');
+  const tokens = Object.fromEntries([...css.matchAll(/--color-([\w-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim()]));
+  const approved = {
+    primary: '#9B1238', danger: '#B42318', success: '#15803D', warning: '#B45309', info: '#1D4ED8', neutral: '#64748B',
+    page: '#F8FAFC', surface: '#FFFFFF', content: '#0F172A', line: '#E2E8F0', selected: '#FFF1F3',
+    'success-surface': '#ECFDF3', 'success-foreground': '#166534', 'warning-surface': '#FFF7E6', 'warning-foreground': '#92400E',
+    'danger-surface': '#FEF3F2', 'danger-foreground': '#B42318', 'info-surface': '#EFF6FF', 'info-foreground': '#1D4ED8',
+    'neutral-surface': '#F1F5F9', 'neutral-foreground': '#475569',
+  };
+  for (const [name, value] of Object.entries(approved)) assert.equal(tokens[name], value, `Approved ${name}`);
+  const resolve = name => tokens[name].startsWith('var(') ? resolve(tokens[name].match(/--color-([\w-]+)/)[1]) : tokens[name];
+  const luminance = name => {
+    const channels = resolve(name).slice(1).match(/../g).map(hex => parseInt(hex, 16) / 255)
+      .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  };
+  const pairs = [['content', 'page'], ['neutral', 'page'], ['neutral', 'surface'], ['primary', 'selected'], ['neutral-foreground', 'selected']];
+  for (const semantic of ['primary', 'danger', 'success', 'warning', 'info']) pairs.push(['surface', semantic], ['surface', `${semantic}-hover`]);
+  for (const semantic of ['danger', 'success', 'warning', 'info', 'neutral']) pairs.push([`${semantic}-foreground`, `${semantic}-surface`]);
+  for (const [foreground, background] of pairs) {
+    const a = luminance(foreground), b = luminance(background);
+    assert.ok((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) >= 4.5, `${foreground} on ${background} meets AA text contrast`);
+  }
+  for (const shade of [400, 500, 600]) assert.equal(resolve(`gray-${shade}`), approved.neutral);
+  assert.equal(resolve('gray-200'), approved.line);
+  assert.ok(css.includes(':focus-visible') && css.includes('border-color: var(--color-danger)'));
+  const review = readFileSync('src/styles/verification-review.css', 'utf8');
+  for (const semantic of ['success', 'warning', 'danger']) assert.ok(review.includes(`var(--color-${semantic})`));
+  const sidebar = readFileSync('src/styles/sidebar.css', 'utf8');
+  assert.ok(sidebar.includes('.sidebar-link.is-active { background: var(--color-selected); color: var(--color-primary); }'));
+  process.stdout.write(`Palette checks passed: ${Object.keys(approved).length} approved tokens, ${pairs.length} AA text pairs, legacy neutral aliases, semantic review actions, sidebar selection and error/focus colors.\n`);
+}
 const storage = () => {
   const values = new Map();
   return {
@@ -31,6 +67,7 @@ global.sessionStorage = storage();
 global.window = { localStorage, sessionStorage };
 
 try {
+  checkColorPalette();
   for (const path of ['src/pages/AdminManagement.jsx', 'src/pages/AuditLogs.jsx', 'src/pages/SystemReports.jsx', 'src/styles/system-reports.css']) {
     assert.ok(existsSync(path), `${path} is in the active structure`);
   }
@@ -263,7 +300,9 @@ try {
         if (path === '/admin-management') {
           const content = html.slice(html.indexOf('<main'));
           assert.ok(content.indexOf('Total Admins') < content.indexOf('Search Admins'));
-          assert.ok(content.indexOf('Create Admin') < content.indexOf('aria-label="Admin account status"'));
+          assert.ok(content.indexOf('Show Active Admins') < content.indexOf('Show Deactivated Admins'));
+          assert.ok(content.indexOf('Show Deactivated Admins') < content.indexOf('Show Total Admins'));
+          assert.ok(!content.includes('aria-label="Admin account status"'));
           assert.ok(html.includes('Create Admin') && html.includes('Loading page'));
           assert.ok(html.includes('Deactivated Admins'));
           assert.ok(!html.includes('maria@lifeflow.test'), 'Real Admin list starts with loading, not mock accounts');
@@ -298,8 +337,10 @@ try {
   await checkRewards(server);
   await checkRewardClaims(server);
   await checkDonors(server);
+  await checkDonorNames(server);
   await checkAuditLogs(server);
   await checkSystemReports(server);
+  await checkSidebar(server);
   assert.equal(hasRole('unknown'), false);
   assert.equal(hasRole(ADMIN_ROLES.ADMIN, []), false);
   process.stdout.write('Auth/navigation checks passed: both sidebars, protected routes, restricted pages, legacy URLs, persistence, logout, invalid sessions.\n');

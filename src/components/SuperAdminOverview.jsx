@@ -2,6 +2,7 @@ import { EmptyState } from './ui/PageState';
 import { Link } from 'react-router-dom';
 import { UserRoundCog, UserCheck, Gift, ArrowRight } from 'lucide-react';
 import { formatDate } from '../data/adminManagement';
+import { formatStaffName } from '../services/staffNames';
 
 export default function SuperAdminOverview({ overview }) {
   const cards = [
@@ -20,9 +21,9 @@ export default function SuperAdminOverview({ overview }) {
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {cards.map(({ label, value, description, icon: Icon, to }) => {
           const Card = to ? Link : 'article';
-          return <Card key={label} {...(to ? { to } : {})} className={`rounded-2xl border border-gray-200 bg-white p-6${to ? ' cursor-pointer transition hover:border-red-200 hover:bg-red-50/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]' : ''}`}>
+          return <Card key={label} {...(to ? { to } : {})} className={`rounded-2xl border border-gray-200 bg-white p-6${to ? ' cursor-pointer transition hover:border-primary-border hover:bg-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary' : ''}`}>
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-[#b7192e]">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-selected text-primary">
                 <Icon size={22} strokeWidth={1.8} />
               </div>
               <h3 className="text-sm font-semibold text-gray-500">{label}</h3>
@@ -39,14 +40,14 @@ export default function SuperAdminOverview({ overview }) {
       <article className="rounded-2xl border border-gray-200 bg-white p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-bold text-gray-800">Recent Admin Activity</h3>
-          <Link to="/audit-logs" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#b7192e] hover:bg-red-50">
+          <Link to="/audit-logs" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-primary hover:bg-selected">
             View Audit Logs <ArrowRight size={16} />
           </Link>
         </div>
         <ul className="divide-y divide-gray-100">
           {overview.recent_admin_activity.map((log) => (
             <li key={log.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
-              <div><p className="font-semibold text-gray-800">{log.actor_name}</p>
+              <div><p className="font-semibold text-gray-800">{formatStaffName(log.actor_name)}</p>
                 <p className="mt-1 text-gray-600">{log.action_label}</p>
               </div>
               <time dateTime={log.created_at} className="text-xs text-gray-500">{formatDate(log.created_at, true)} (PHT)</time>

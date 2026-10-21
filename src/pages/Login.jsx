@@ -42,11 +42,11 @@ function Login() {
   return (
     <div className="grid min-h-svh bg-white lg:grid-cols-[0.8fr_1.2fr]">
       {/* Login section */}
-      <section className="flex min-w-0 items-center justify-center bg-[#fafafa] px-4 py-6 sm:px-8 lg:order-2 lg:px-12 lg:py-10">
+      <section className="flex min-w-0 items-center justify-center bg-page px-4 py-6 sm:px-8 lg:order-2 lg:px-12 lg:py-10">
         <div className="w-full min-w-0 max-w-lg rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-10">
           {/* Admin portal label */}
           <div className="mb-6">
-            <p className="text-xs font-extrabold tracking-[0.18em] text-[#b7192e]">
+            <p className="text-xs font-extrabold tracking-[0.18em] text-primary">
               LIFEFLOW ADMIN
             </p>
 
@@ -67,7 +67,7 @@ function Login() {
           </div>
 
           <form onSubmit={handleSubmit} className="mt-8" aria-busy={busy}>
-            {error && <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+            {error && <p role="alert" className="mb-4 rounded-lg bg-danger-surface p-3 text-sm text-danger-foreground">{error}</p>}
             {/* Admin email */}
             <div className="mb-5">
               <label
@@ -87,7 +87,7 @@ function Login() {
                 onChange={(event) => setEmail(event.target.value)}
                 disabled={busy}
                 required
-                className="h-13 w-full rounded-xl border border-gray-300 px-4 text-base text-gray-900 outline-none transition focus:border-[#b7192e] lg:text-sm"
+                className="h-13 w-full rounded-xl border border-gray-300 px-4 text-base text-gray-900 outline-none transition focus:border-primary lg:text-sm"
               />
             </div>
 
@@ -108,7 +108,7 @@ function Login() {
                 autoComplete="current-password"
                 disabled={busy}
                 required
-                className="h-13 w-full rounded-xl border border-gray-300 px-4 text-base text-gray-900 outline-none transition focus:border-[#b7192e] lg:text-sm"
+                className="h-13 w-full rounded-xl border border-gray-300 px-4 text-base text-gray-900 outline-none transition focus:border-primary lg:text-sm"
               />
             </div>
 
@@ -121,7 +121,7 @@ function Login() {
                   checked={remember}
                   disabled={busy}
                   onChange={(event) => { setRemember(event.target.checked); if (!event.target.checked) rememberEmail('', false); }}
-                  className="h-4 w-4 accent-[#b7192e]"
+                  className="h-4 w-4 accent-primary"
                 />
 
                 <span>Remember Email</span>
@@ -129,7 +129,7 @@ function Login() {
 
               <Link
                 to="/forgot-password"
-                className="text-left text-sm font-semibold text-[#b7192e] hover:underline"
+                className="text-left text-sm font-semibold text-primary hover:underline"
               >
                 Forgot password?
               </Link>
@@ -138,7 +138,7 @@ function Login() {
             <button
               type="submit"
               disabled={busy}
-              className="h-13 w-full rounded-xl bg-[#b7192e] text-sm font-bold text-white transition hover:bg-[#9f1427]"
+              className="h-13 w-full rounded-xl bg-primary text-sm font-bold text-white transition hover:bg-primary-hover"
             >
               {busy ? 'Signing in…' : 'Sign In'}
             </button>
@@ -149,7 +149,7 @@ function Login() {
           </p>
         </div>
       </section>
-      <section className="relative flex min-w-0 items-center justify-center overflow-hidden bg-gradient-to-br from-[#8f0f1d] via-[#b7192e] to-[#d62d41] px-6 py-8 text-white lg:order-1 lg:px-10 lg:py-12">
+      <section className="relative flex min-w-0 items-center justify-center overflow-hidden bg-gradient-to-br from-primary-hover via-primary to-primary px-6 py-8 text-white lg:order-1 lg:px-10 lg:py-12">
         <div className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full bg-white/5" />
         <div className="pointer-events-none absolute -bottom-32 -right-20 h-80 w-80 rounded-full bg-white/5" />
         <div className="relative z-10 flex w-full max-w-xl flex-col items-center text-center">

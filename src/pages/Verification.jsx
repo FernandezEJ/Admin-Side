@@ -1,3 +1,4 @@
+import { formatDonorName } from '../services/staffNames';
 import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
 import { useMemo, useRef, useState } from 'react';
 
@@ -21,10 +22,10 @@ import { filterVerifications, VERIFICATION_STATUS_LABELS } from '../services/ver
 import VerificationReviewDrawer from '../components/verification/VerificationReviewDrawer';
 
 const statusAppearance = {
-  for_verification: { icon: Clock3, className: 'bg-amber-50 text-amber-600' },
-  needs_revision: { icon: RotateCcw, className: 'bg-orange-50 text-orange-600' },
-  completed: { icon: CircleCheck, className: 'bg-green-50 text-green-600' },
-  rejected: { icon: CircleX, className: 'bg-red-50 text-red-600' },
+  for_verification: { icon: Clock3, className: 'bg-warning-surface text-warning-foreground' },
+  needs_revision: { icon: RotateCcw, className: 'bg-warning-surface text-warning-foreground' },
+  completed: { icon: CircleCheck, className: 'bg-success-surface text-success-foreground' },
+  rejected: { icon: CircleX, className: 'bg-danger-surface text-danger-foreground' },
 };
 
 function Verification() {
@@ -106,7 +107,7 @@ export function VerificationView({ remote }) {
   const renderStatus = (status) => {
     if (status === 'for_verification') {
       return (
-        <span className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-[#b7192e]">
+        <span className="inline-flex rounded-full bg-warning-surface px-3 py-1.5 text-xs font-semibold text-warning-foreground">
           For Verification
         </span>
       );
@@ -114,7 +115,7 @@ export function VerificationView({ remote }) {
 
     if (status === 'needs_revision') {
       return (
-        <span className="inline-flex rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700">
+        <span className="inline-flex rounded-full bg-warning-surface px-3 py-1.5 text-xs font-semibold text-warning-foreground">
           Need Revision
         </span>
       );
@@ -122,21 +123,21 @@ export function VerificationView({ remote }) {
 
     if (status === 'completed') {
       return (
-        <span className="inline-flex rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
+        <span className="inline-flex rounded-full bg-success-surface px-3 py-1.5 text-xs font-semibold text-success-foreground">
           Completed
         </span>
       );
     }
 
     return (
-      <span className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-red-700">
+      <span className="inline-flex rounded-full bg-danger-surface px-3 py-1.5 text-xs font-semibold text-danger-foreground">
         Rejected
       </span>
     );
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f7f8fa]">
+    <div className="flex min-h-screen bg-page">
       <Sidebar />
 
       <main className="min-w-0 flex-1">
@@ -172,8 +173,8 @@ export function VerificationView({ remote }) {
                 onClick={() => setActiveTab(status)}
                 aria-label={`Show ${label} records`}
                 aria-pressed={activeTab === status}
-                className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-red-200 hover:bg-red-50/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] ${
-                  activeTab === status ? 'border-red-200 bg-red-50/30' : 'border-gray-200 bg-white'
+                className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-primary-border hover:bg-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                  activeTab === status ? 'border-primary-border bg-selected' : 'border-gray-200 bg-white'
                 }`}
               >
                 <span className="flex items-center justify-between gap-3">
@@ -206,7 +207,7 @@ export function VerificationView({ remote }) {
                     onClick={() => setActiveTab(id)}
                     className={`border-b-2 pb-4 text-sm font-semibold transition ${
                       activeTab === id
-                        ? 'border-[#b7192e] text-[#b7192e]'
+                        ? 'border-primary text-primary'
                         : 'border-transparent text-gray-400 hover:text-gray-700'
                     }`}
                   >
@@ -233,7 +234,7 @@ export function VerificationView({ remote }) {
                     setSearchTerm(event.target.value)
                   }
                   placeholder="Search donor, blood type, or event..."
-                  className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-[#b7192e] focus:bg-white"
+                  className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-primary focus:bg-white"
                 />
               </div>
 
@@ -242,7 +243,7 @@ export function VerificationView({ remote }) {
                 onChange={(event) =>
                   setSelectedMonth(event.target.value)
                 }
-                className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"
+                className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-primary"
               >
                 <option value="all">All Months</option>
 
@@ -255,15 +256,15 @@ export function VerificationView({ remote }) {
 
               <div role="group" aria-label="Verification year" className="flex h-11 shrink-0 items-center rounded-xl border border-gray-200 bg-white">
                 <button type="button" aria-label="Previous year" onClick={() => setSelectedYear((year) => String((year === 'all' ? currentYear : Number(year)) - 1))}
-                  className="flex h-full w-11 items-center justify-center rounded-l-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
+                  className="flex h-full w-11 items-center justify-center rounded-l-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                   <ChevronDown size={18} aria-hidden="true" />
                 </button>
                 <button type="button" aria-label="All years" aria-pressed={selectedYear === 'all'} title="All Years" onClick={() => setSelectedYear('all')}
-                  className="h-full w-24 text-center text-sm font-semibold tabular-nums text-gray-700 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
+                  className="h-full w-24 text-center text-sm font-semibold tabular-nums text-gray-700 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                   {selectedYear === 'all' ? 'All Years' : selectedYear}
                 </button>
                 <button type="button" aria-label="Next year" onClick={() => setSelectedYear((year) => String((year === 'all' ? currentYear : Number(year)) + 1))}
-                  className="flex h-full w-11 items-center justify-center rounded-r-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
+                  className="flex h-full w-11 items-center justify-center rounded-r-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                   <ChevronUp size={18} aria-hidden="true" />
                 </button>
               </div>
@@ -314,7 +315,7 @@ export function VerificationView({ remote }) {
                     <tr
                       key={request.id}
                       tabIndex={0}
-                      aria-label={`Review verification for ${request.donor}, ${VERIFICATION_STATUS_LABELS[request.status]}`}
+                      aria-label={`Review verification for ${formatDonorName(request.donor)}, ${VERIFICATION_STATUS_LABELS[request.status]}`}
                       aria-haspopup="dialog"
                       onClick={(event) => {
                         if (event.target.closest('button, a, input, select, textarea')) return;
@@ -324,16 +325,16 @@ export function VerificationView({ remote }) {
                         if (event.target !== event.currentTarget) return;
                         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openReview(request.id, event.currentTarget); }
                       }}
-                      className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#b7192e] last:border-0"
+                      className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary last:border-0"
                     >
                       <td className="break-words px-4 py-5">
                         <p className="font-semibold text-gray-800">
-                          {request.donor}
+                          {formatDonorName(request.donor)}
                         </p>
                       </td>
 
                       <td className="px-4 py-5">
-                        <span className="inline-flex min-w-10 justify-center rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#b7192e]">
+                        <span className="inline-flex min-w-10 justify-center rounded-lg px-2.5 py-1.5 text-xs font-bold text-primary">
                           {request.bloodType}
                         </span>
                       </td>
@@ -350,9 +351,9 @@ export function VerificationView({ remote }) {
                         {renderStatus(request.status)}
                       </td>
                       <td className="px-2 py-5 text-right">
-                        <button type="button" aria-label={`View verification for ${request.donor}`} aria-haspopup="dialog"
+                        <button type="button" aria-label={`View verification for ${formatDonorName(request.donor)}`} aria-haspopup="dialog"
                           onClick={(event) => { event.stopPropagation(); openReview(request.id, event.currentTarget); }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2 py-2 text-xs font-semibold text-gray-600 transition hover:border-red-100 hover:bg-red-50 hover:text-[#b7192e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2 py-2 text-xs font-semibold text-gray-600 transition hover:border-primary-border hover:bg-selected hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                           <Eye size={14} aria-hidden="true" />View
                         </button>
                       </td>

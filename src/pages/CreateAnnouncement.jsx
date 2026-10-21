@@ -62,7 +62,7 @@ function CreateAnnouncement() {
   const handlePublish = (event) => { event.preventDefault(); void save('published'); };
 
   return (
-    <div className="flex min-h-screen bg-[#f7f8fa]">
+    <div className="flex min-h-screen bg-page">
       <Sidebar />
 
       <main className="min-w-0 flex-1">
@@ -76,7 +76,7 @@ function CreateAnnouncement() {
             <button
               type="button"
               onClick={returnToList}
-              className="mb-5 flex items-center gap-2 text-sm font-semibold text-gray-500 transition hover:text-[#b7192e]"
+              className="mb-5 flex items-center gap-2 text-sm font-semibold text-gray-500 transition hover:text-primary"
             >
               <ArrowLeft size={17} />
               Back to Announcements
@@ -96,7 +96,7 @@ function CreateAnnouncement() {
                 </p>
               </div>
 
-              {error && <p role="alert" className="mb-4 text-sm text-red-700">{error}</p>}
+              {error && <p role="alert" className="mb-4 text-sm text-danger-foreground">{error}</p>}
               <div className="grid gap-6 lg:grid-cols-2">
                 {/* Left column */}
                 <div className="space-y-5">
@@ -116,7 +116,7 @@ function CreateAnnouncement() {
                       onChange={handleChange}
                       placeholder="Enter announcement title"
                       required
-                      className="h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none transition focus:border-[#b7192e] focus:ring-2 focus:ring-red-100"
+                      className="h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary-border"
                     />
                   </div>
 
@@ -148,7 +148,7 @@ function CreateAnnouncement() {
                       onChange={handleChange}
                       placeholder="Enter donation location"
                       required
-                      className="h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none transition focus:border-[#b7192e] focus:ring-2 focus:ring-red-100"
+                      className="h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary-border"
                     />
                   </div>
                 </div>
@@ -160,7 +160,7 @@ function CreateAnnouncement() {
                       Announcement Image
                     </label>
 
-                    <label className="flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-5 text-center transition hover:border-[#b7192e] hover:bg-red-50/30">
+                    <label className="flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-5 text-center transition hover:border-primary hover:bg-selected">
                       <ImagePlus
                         size={30}
                         className="mb-3 text-gray-400"
@@ -201,7 +201,7 @@ function CreateAnnouncement() {
                       value={formData.donationDate}
                       onChange={handleChange}
                       required
-                      className="h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none focus:border-[#b7192e]"
+                      className="h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none focus:border-primary"
                     />
                   </div>
 
@@ -220,7 +220,7 @@ function CreateAnnouncement() {
                       value={formData.expiresDate}
                       onChange={handleChange}
                       required
-                      className="h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none focus:border-[#b7192e]"
+                      className="h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none focus:border-primary"
                     />
 
                     <p className="mt-2 text-xs text-gray-400">
@@ -235,7 +235,7 @@ function CreateAnnouncement() {
                       name="notifyDonors"
                       checked={formData.notifyDonors}
                       onChange={handleChange}
-                      className="mt-1 h-4 w-4 accent-[#b7192e]"
+                      className="mt-1 h-4 w-4 accent-primary"
                     />
 
                     <div>
@@ -266,7 +266,7 @@ function CreateAnnouncement() {
                   type="button"
                   disabled={busy || item?.status === 'deleted'}
                   onClick={handleSaveDraft}
-                  className="min-h-11 rounded-xl border border-[#b7192e] px-5 text-sm font-semibold text-[#b7192e] transition hover:bg-red-50"
+                  className="min-h-11 rounded-xl border border-primary px-5 text-sm font-semibold text-primary transition hover:bg-selected"
                 >
                   Save as Draft
                 </button>
@@ -274,7 +274,7 @@ function CreateAnnouncement() {
                 <button
                   disabled={busy || item?.status === 'deleted'}
                   type="submit"
-                  className="min-h-11 rounded-xl bg-[#b7192e] px-6 text-sm font-semibold text-white transition hover:bg-[#9f1427]"
+                  className="min-h-11 rounded-xl bg-primary px-6 text-sm font-semibold text-white transition hover:bg-primary-hover"
                 >
                   {busy ? 'Saving...' : 'Publish Announcement'}
                 </button>

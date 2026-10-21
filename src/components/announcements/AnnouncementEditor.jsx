@@ -62,12 +62,12 @@ export default function AnnouncementEditor({ value, onChange, disabled, submitte
       {controls.map(([name, label, Icon], index) => <button key={name} type="button" aria-label={label} title={label}
         aria-controls="description" aria-pressed={index < 4 ? Boolean(active[name]) : undefined} disabled={disabled}
         onMouseDown={(event) => event.preventDefault()} onClick={() => command(name)}
-        className={`flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-[#b7192e] disabled:opacity-50 ${active[name] ? 'bg-red-50 text-[#b7192e]' : ''}`}><Icon size={17} /></button>)}
+        className={`flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 hover:bg-selected focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50 ${active[name] ? 'bg-selected text-primary' : ''}`}><Icon size={17} /></button>)}
     </div>
     <div ref={editor} id="description" role="textbox" aria-label="Description" aria-multiline="true" aria-required="true" aria-disabled={disabled}
       aria-describedby="description-guidance" aria-invalid={Boolean(error)} contentEditable={!disabled} suppressContentEditableWarning
       onInput={changed} onPaste={paste} onDrop={(event) => event.preventDefault()}
       className="announcement-rich-text min-h-48 max-h-96 overflow-y-auto break-words px-4 py-3 text-sm leading-6 text-gray-800 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_strong]:font-bold [&_b]:font-bold [&_em]:italic [&_i]:italic" />
-    <p id="description-guidance" className={`px-4 pb-3 text-xs ${error ? 'text-red-700' : 'text-gray-400'}`} role={error ? 'alert' : undefined}>{error || 'Bold, italic, and simple lists. Maximum 10,000 characters.'}</p>
+    <p id="description-guidance" className={`px-4 pb-3 text-xs ${error ? 'text-danger-foreground' : 'text-gray-400'}`} role={error ? 'alert' : undefined}>{error || 'Bold, italic, and simple lists. Maximum 10,000 characters.'}</p>
   </div>;
 }

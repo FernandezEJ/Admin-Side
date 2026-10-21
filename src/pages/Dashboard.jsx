@@ -22,6 +22,7 @@ import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { useAdminSession } from '../auth/useAdminSession';
 import SuperAdminOverview from '../components/SuperAdminOverview';
+import { formatDonorName } from '../services/staffNames';
 
 import { Link } from 'react-router-dom';
 import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
@@ -45,7 +46,7 @@ export function DashboardView({ remote }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f7f8fa]">
+    <div className="flex min-h-screen bg-page">
       {/* Sticky sidebar */}
       <Sidebar />
 
@@ -70,10 +71,10 @@ export function DashboardView({ remote }) {
                 <Card
                   key={stat.title}
                   {...(stat.to ? { to: stat.to } : {})}
-                  className={`rounded-2xl border border-gray-200 bg-white p-6${stat.to ? ' cursor-pointer transition hover:border-red-200 hover:bg-red-50/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]' : ''}`}
+                  className={`rounded-2xl border border-gray-200 bg-white p-6${stat.to ? ' cursor-pointer transition hover:border-primary-border hover:bg-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary' : ''}`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-[#b7192e]">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-selected text-primary">
                       <Icon size={22} strokeWidth={1.8} />
                     </div>
 
@@ -112,7 +113,7 @@ export function DashboardView({ remote }) {
                   </p>
                 </div>
 
-                <select aria-label="Donation Activity period" value={months} onChange={(event) => model.load(Number(event.target.value))} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-600 outline-none focus:border-[#b7192e]">
+                <select aria-label="Donation Activity period" value={months} onChange={(event) => model.load(Number(event.target.value))} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-600 outline-none focus:border-primary">
                   <option value={6}>Last 6 months</option>
                   <option value={12}>Last 12 months</option>
                 </select>
@@ -120,7 +121,7 @@ export function DashboardView({ remote }) {
 
               <div className="relative h-72 w-full" aria-busy={!!chartLoading}>
                 {chartLoading ? <div role="status" aria-label="Loading Donation Activity" className="flex h-full items-center justify-center">
-                  <span aria-hidden="true" className="h-6 w-6 rounded-full border-2 border-red-100 border-t-[#b7192e] motion-safe:animate-spin" />
+                  <span aria-hidden="true" className="h-6 w-6 rounded-full border-2 border-primary-border border-t-primary motion-safe:animate-spin" />
                 </div> : chartError ? <ErrorState title="Unable to load Donation Activity" description={chartError} onRetry={() => model.load()} /> : <>
                 {!donationActivity.some((item) => item.donations > 0) && <p role="status" className="absolute left-0 top-0 text-sm text-gray-500">No completed donations in this period.</p>}
                 <ResponsiveContainer width="100%" height="100%">
@@ -128,7 +129,7 @@ export function DashboardView({ remote }) {
                     <CartesianGrid
                       strokeDasharray="3 3"
                       vertical={false}
-                      stroke="#eeeeee"
+                      stroke="var(--color-line)"
                     />
 
                     <XAxis
@@ -136,7 +137,7 @@ export function DashboardView({ remote }) {
                       axisLine={false}
                       tickLine={false}
                       tick={{
-                        fill: '#9ca3af',
+                        fill: 'var(--color-neutral)',
                         fontSize: 12,
                       }}
                     />
@@ -146,25 +147,25 @@ export function DashboardView({ remote }) {
                       tickLine={false}
                       allowDecimals={false}
                       tick={{
-                        fill: '#9ca3af',
+                        fill: 'var(--color-neutral)',
                         fontSize: 12,
                       }}
                     />
 
                     <Tooltip
                       cursor={{
-                        fill: '#fff5f6',
+                        fill: 'var(--color-selected)',
                       }}
                       contentStyle={{
                         borderRadius: '10px',
-                        border: '1px solid #eeeeee',
+                        border: '1px solid var(--color-line)',
                         fontSize: '12px',
                       }}
                     />
 
                     <Bar
                       dataKey="donations"
-                      fill="#b7192e"
+                      fill="var(--color-primary)"
                       radius={[6, 6, 0, 0]}
                       maxBarSize={42}
                     />
@@ -203,16 +204,16 @@ export function DashboardView({ remote }) {
                       {bloodTypeData.map((entry) => (
                         <Cell
                           key={entry.bloodType}
-                          fill={BLOOD_TYPE_COLORS[entry.bloodType] ?? '#6B7280'}
+                          fill={BLOOD_TYPE_COLORS[entry.bloodType] ?? 'var(--color-neutral)'}
                         />
                       ))}
                     </Pie>
 
                     <Tooltip
-                      itemStyle={{ color: '#374151' }}
+                      itemStyle={{ color: 'var(--color-neutral-foreground)' }}
                       contentStyle={{
                         borderRadius: '10px',
-                        border: '1px solid #eeeeee',
+                        border: '1px solid var(--color-line)',
                         fontSize: '12px',
                       }}
                     />
@@ -231,7 +232,7 @@ export function DashboardView({ remote }) {
                       <span
                         className="h-2.5 w-2.5 rounded-full"
                         style={{
-                          backgroundColor: BLOOD_TYPE_COLORS[item.bloodType] ?? '#6B7280',
+                          backgroundColor: BLOOD_TYPE_COLORS[item.bloodType] ?? 'var(--color-neutral)',
                         }}
                       />
 
@@ -266,7 +267,7 @@ export function DashboardView({ remote }) {
 
               <Link
                 to="/verification"
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#b7192e] transition hover:bg-red-50"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-primary transition hover:bg-selected"
               >
                 View all
                 <ArrowRight size={16} />
@@ -309,7 +310,7 @@ export function DashboardView({ remote }) {
                       className="border-b border-gray-100 last:border-0"
                     >
                       <td className="px-3 py-4 text-sm font-semibold text-gray-800">
-                        {request.donor}
+                        {formatDonorName(request.donor)}
                       </td>
 
                       <td className="px-3 py-4 text-sm text-gray-500">
@@ -325,7 +326,7 @@ export function DashboardView({ remote }) {
                       </td>
 
                       <td className="px-3 py-4">
-                        <span className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-[#b7192e]">
+                        <span className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-primary">
                           {request.status === 'needs_revision' ? 'Need Revision' : 'For Verification'}
                         </span>
                       </td>
@@ -333,7 +334,7 @@ export function DashboardView({ remote }) {
                       <td className="px-3 py-4">
                         <Link
                           to={`/verification/${request.id}`}
-                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-[#b7192e] transition hover:bg-red-50"
+                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-selected"
                         >
                           View
                         </Link>

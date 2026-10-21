@@ -1,5 +1,6 @@
 import { useAnnouncements } from '../services/useAnnouncements';
 import AnnouncementBody from '../components/announcements/AnnouncementBody';
+import { formatDonorName } from '../services/staffNames';
 import { ErrorState, PageSkeleton } from '../components/ui/PageState';
 import { ArrowLeft, MapPin, CalendarDays, Users } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -20,7 +21,7 @@ function ViewAnnouncement() {
   const [showParticipants, setShowParticipants] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-[#f7f8fa]">
+    <div className="flex min-h-screen bg-page">
       <Sidebar />
 
       <main className="min-w-0 flex-1">
@@ -34,7 +35,7 @@ function ViewAnnouncement() {
             <button
               type="button"
               onClick={() => navigate('/announcements')}
-              className="mb-5 flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-[#b7192e]"
+              className="mb-5 flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-primary"
             >
               <ArrowLeft size={17} />
               Back to Announcements
@@ -85,7 +86,7 @@ export function AnnouncementPopupView({ remote, onClose, onEdit, onAction }) {
     <AdminDialog title={participantsOpen ? 'Joined Participants' : 'View Announcement'} onClose={onClose} dismissOnBackdrop closeDisabled={busy}>
       <div className="announcement-popup-content">
       {participantsOpen ? <AnnouncementParticipants remote={remote} /> : loading ? <PageSkeleton /> : !item ? <ErrorState description={error || 'Announcement not found.'} onRetry={model.load} /> : <>
-        {error && <p role="alert" className="mb-4 text-sm text-red-700">{error}</p>}
+        {error && <p role="alert" className="mb-4 text-sm text-danger-foreground">{error}</p>}
         <AnnouncementDetails announcement={item} compact participantButtonRef={participantsButton}
           onViewParticipants={() => { setParticipantsOpen(true); void model.loadParticipants(); }} />
       </>}
@@ -95,9 +96,9 @@ export function AnnouncementPopupView({ remote, onClose, onEdit, onAction }) {
         <div className="announcement-popup-footer">
           {item.status !== 'deleted' ? <>
             <button type="button" disabled={busy} onClick={onEdit}
-              className="min-h-11 rounded-xl bg-[#b7192e] px-5 text-sm font-semibold text-white transition hover:bg-[#9f1427] disabled:opacity-50">Edit Announcement</button>
+              className="min-h-11 rounded-xl bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:opacity-50">Edit Announcement</button>
             <button type="button" disabled={busy} onClick={() => onAction('delete')}
-              className="min-h-11 rounded-xl border border-red-200 px-5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50">{busy ? 'Deleting...' : 'Delete'}</button>
+              className="min-h-11 rounded-xl border border-danger-border px-5 text-sm font-semibold text-danger-foreground transition hover:bg-danger-surface disabled:opacity-50">{busy ? 'Deleting...' : 'Delete'}</button>
           </> : <button type="button" disabled={busy || !isRecoverable(item)} onClick={() => onAction('restore')}
             title={isRecoverable(item) ? 'Restore to Drafts' : 'Recovery period ended; awaiting backend purge'}
             className="min-h-11 rounded-xl border border-gray-300 px-5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:opacity-50">{busy ? 'Restoring...' : 'Restore Announcement'}</button>}
@@ -117,7 +118,7 @@ export function AnnouncementDetails({ announcement, compact = false, onViewParti
               <div className="announcement-copy p-7">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${announcement.status === 'active' ? 'bg-success-surface text-success-foreground' : announcement.status === 'deleted' ? 'bg-danger-surface text-danger-foreground' : 'bg-neutral-surface text-neutral-foreground'}`}>
                       {announcement.status}
                     </span>
 
@@ -180,11 +181,11 @@ export function JoinedParticipants({ announcement, onView, buttonRef }) {
         <p className="mt-1 text-xs text-gray-500">{known ? `${announcement.participants_count} joined` : 'Participant count unavailable'}</p>
       </div>
       {onView && <button ref={buttonRef} type="button" disabled={!known} onClick={onView}
-        className="min-h-10 rounded-lg px-2 text-xs font-semibold text-[#b7192e] hover:bg-red-50 disabled:opacity-50">View Participants</button>}
+        className="min-h-10 rounded-lg px-2 text-xs font-semibold text-primary hover:bg-selected disabled:opacity-50">View Participants</button>}
     </div>
     {known && announcement.participants_count > 0 && preview.length > 0 && <div className="mt-2 flex -space-x-1.5" aria-label="Joined donor preview">
-      {preview.map((donor) => <span key={donor.id} title={donor.name} aria-label={donor.name}
-        className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-50 text-xs font-bold text-[#b7192e]">{donor.name.trim().split(/\s+/).filter((_, index, names) => index === 0 || index === names.length - 1).map((part) => part[0]).join('').toUpperCase()}</span>)}
+      {preview.map((donor) => <span key={donor.id} title={formatDonorName(donor.name)} aria-label={formatDonorName(donor.name)}
+        className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-selected text-xs font-bold text-primary">{donor.name.trim().split(/\s+/).filter((_, index, names) => index === 0 || index === names.length - 1).map((part) => part[0]).join('').toUpperCase()}</span>)}
     </div>}
   </section>;
 }
@@ -206,8 +207,8 @@ export function AnnouncementParticipants({ remote }) {
       {meta && <p className="my-3 text-xs text-gray-500" role="status">{meta.total} participation {meta.total === 1 ? 'record' : 'records'}</p>}
       {participants.length === 0 && !loading ? <p role="status" className="py-6 text-center text-sm text-gray-500">No participants have joined this announcement.</p> :
         <ul aria-label="Announcement participants" className="divide-y divide-gray-100">{participants.map((entry) => <li key={entry.id} className="py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2"><p className="min-w-0 break-words text-sm font-semibold text-gray-800">{entry.donor?.name || 'Unavailable donor'}</p>
-            <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">{participantLabels[entry.status] ?? 'Unknown status'}</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><p className="min-w-0 break-words text-sm font-semibold text-gray-800">{formatDonorName(entry.donor?.name) || 'Unavailable donor'}</p>
+            <span className={`rounded-full px-2 py-1 text-xs ${entry.status === 'completed' ? 'bg-success-surface text-success-foreground' : entry.status === 'rejected' ? 'bg-danger-surface text-danger-foreground' : ['pending', 'for_verification', 'needs_revision'].includes(entry.status) ? 'bg-warning-surface text-warning-foreground' : 'bg-neutral-surface text-neutral-foreground'}`}>{participantLabels[entry.status] ?? 'Unknown status'}</span></div>
           <p className="mt-1 text-xs text-gray-500">Joined {joinedDate(entry.joined_at)}</p>
           {entry.cancelled_at && <p className="mt-1 text-xs text-gray-500">Cancelled {joinedDate(entry.cancelled_at)}</p>}
         </li>)}</ul>}

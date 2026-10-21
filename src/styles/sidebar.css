@@ -1,0 +1,69 @@
+.lifeflow-navigation {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  flex: 0 0 256px;
+  width: 256px;
+  height: 100dvh;
+}
+
+.lifeflow-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 24px 14px 16px;
+  border-right: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-neutral);
+}
+
+.sidebar-heading { position: relative; flex-shrink: 0; margin-bottom: 26px; }
+.sidebar-brand { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 10px; border-radius: 12px; }
+.sidebar-brand:hover { background: var(--color-page); }
+.sidebar-logo { display: flex; flex-shrink: 0; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; background: var(--color-primary); color: var(--color-surface); font-weight: 700; font-size: 18px; }
+.sidebar-wordmark { display: block; color: var(--color-content); font-size: 18px; font-weight: 700; line-height: 24px; }
+.sidebar-subtitle { display: block; color: var(--color-neutral); font-size: 12px; }
+.sidebar-toggle { position: absolute; top: 7px; right: -29px; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid var(--color-line); border-radius: 50%; background: var(--color-surface); color: var(--color-neutral); cursor: pointer; }
+.sidebar-toggle:hover { color: var(--color-primary); background: var(--color-selected); }
+.sidebar-menu { flex: 1; min-height: 80px; overflow-y: auto; }
+.sidebar-section + .sidebar-section { margin-top: 25px; }
+.sidebar-section-title { margin: 0 12px 10px; color: var(--color-neutral); font-size: 10px; font-weight: 600; line-height: 16px; letter-spacing: 1.2px; }
+.sidebar-link { display: flex; align-items: center; gap: 12px; min-height: 46px; width: 100%; margin: 3px 0; padding: 10px 12px; border-radius: 12px; font-size: 13px; font-weight: 500; text-align: left; cursor: pointer; }
+.sidebar-link svg { flex-shrink: 0; }
+.sidebar-link:hover { background: var(--color-selected); color: var(--color-primary); }
+.sidebar-link.is-active { background: var(--color-selected); color: var(--color-primary); }
+.sidebar-user { flex-shrink: 0; padding-top: 20px; }
+.sidebar-profile { display: flex; align-items: center; gap: 10px; padding: 5px 10px 14px; }
+.sidebar-avatar { display: flex; flex-shrink: 0; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: var(--color-selected); color: var(--color-primary); font-size: 12px; font-weight: 600; }
+.sidebar-identity { min-width: 0; }
+.sidebar-name, .sidebar-email, .sidebar-role { display: block; overflow-wrap: anywhere; }
+.sidebar-name { color: var(--color-neutral-foreground); font-size: 12px; font-weight: 600; line-height: 18px; }
+.sidebar-email, .sidebar-role { color: var(--color-neutral); font-size: 10px; line-height: 16px; }
+.sidebar-logout { border-top: 1px solid var(--color-line); padding-top: 10px; }
+.sidebar-mobile-close, .sidebar-backdrop { display: none; }
+
+@media (min-width: 1024px) {
+  .lifeflow-navigation.is-collapsed { flex-basis: 80px; width: 80px; }
+  .is-collapsed .lifeflow-sidebar { padding-right: 12px; padding-left: 12px; }
+  .is-collapsed .sidebar-label, .is-collapsed .sidebar-section-title { display: none; }
+  .is-collapsed .sidebar-brand, .is-collapsed .sidebar-link, .is-collapsed .sidebar-profile { justify-content: center; padding-right: 0; padding-left: 0; }
+  .is-collapsed .sidebar-toggle { right: -27px; }
+  .is-collapsed .sidebar-profile { padding-bottom: 14px; }
+  .is-collapsed .sidebar-section + .sidebar-section { margin-top: 20px; border-top: 1px solid var(--color-line); padding-top: 16px; }
+}
+
+@media (max-width: 1023px) {
+  .lifeflow-navigation { position: static; flex-basis: 0; width: 0; height: 0; }
+  .lifeflow-sidebar { display: none; position: fixed; inset: 0 auto 0 0; z-index: 60; width: min(280px, calc(100vw - 32px)); height: 100dvh; padding-top: max(20px, env(safe-area-inset-top)); padding-bottom: max(16px, env(safe-area-inset-bottom)); box-shadow: 6px 0 30px #1118271a; }
+  .is-open .lifeflow-sidebar { display: flex; }
+  .sidebar-backdrop { display: block; position: fixed; inset: 0; z-index: 59; background: #11182766; }
+  .sidebar-toggle { display: none; }
+  .sidebar-mobile-close { display: flex; position: absolute; top: 0; right: 0; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; cursor: pointer; }
+  .sidebar-mobile-close:hover { color: var(--color-primary); background: var(--color-selected); }
+  .sidebar-brand { margin-right: 40px; }
+}
+
+@media print {
+  .lifeflow-navigation { display: none; }
+}

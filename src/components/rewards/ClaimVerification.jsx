@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useAdminSession } from '../../auth/useAdminSession';
+import { formatDonorName } from '../../services/staffNames';
 import { canConfirmClaim, claimStatusLabel, createRewardClaims } from '../../services/rewardClaims';
 import AdminDialog from '../ui/AdminDialog';
 
-const primaryButton = 'min-h-11 rounded-xl bg-[#b7192e] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#9f1427] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] disabled:cursor-not-allowed disabled:opacity-60';
-const secondaryButton = 'min-h-11 rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] disabled:cursor-not-allowed disabled:opacity-60';
+const buttonBase = 'min-h-11 rounded-xl px-5 py-3 text-sm font-semibold text-white transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60';
+const primaryButton = `${buttonBase} bg-primary hover:bg-primary-hover`;
+const successButton = `${buttonBase} bg-success hover:bg-success-hover`;
+const secondaryButton = 'min-h-11 rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60';
 
 export default function ClaimVerification({ onClaimed }) {
   const { requestAdmin } = useAdminSession();
@@ -38,31 +41,31 @@ export function ClaimVerificationView({ state, model, inputRef, confirmRef, mark
             className="min-h-11 min-w-0 flex-1 rounded-xl border border-gray-200 px-4 py-3 font-mono text-base uppercase text-gray-800 disabled:bg-gray-50" />
           <button type="submit" disabled={busy || !!claim} className={primaryButton}>{state.verifying ? 'Verifying...' : 'Verify Code'}</button>
         </div>
-        <p id="claim-code-help" className="mt-2 text-xs leading-5 text-gray-500">Enter LFW- followed by six letters or numbers.</p>
-        {state.error && <p id="claim-code-error" role="alert" className="mt-3 text-sm text-red-700">{state.error}</p>}
-        {state.notice && <p role="status" className="mt-3 text-sm text-green-700">{state.notice}</p>}
+        <p id="claim-code-help" className="mt-2 text-xs leading-5 text-info">Enter LFW- followed by six letters or numbers.</p>
+        {state.error && <p id="claim-code-error" role="alert" className="mt-3 text-sm text-danger-foreground">{state.error}</p>}
+        {state.notice && <p role="status" className="mt-3 text-sm text-success-foreground">{state.notice}</p>}
       </form>
     </div>
     {claim && <AdminDialog title="Verification Result" onClose={model.close} dismissOnBackdrop closeDisabled={busy}>
       <div aria-busy={state.confirming || state.refreshing}>
-        <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${claim.claim_status === 'pending_claim' ? 'bg-amber-50 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>{claimStatusLabel(claim)}</span>
+        <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${claim.claim_status === 'pending_claim' ? 'bg-warning-surface text-warning-foreground' : claim.claim_status === 'claimed' ? 'bg-success-surface text-success-foreground' : 'bg-neutral-surface text-neutral-foreground'}`}>{claimStatusLabel(claim)}</span>
         <dl className="mt-5 space-y-4 text-sm">
-          <div><dt className="font-medium text-gray-500">Donor Name</dt><dd className="mt-1 break-words font-semibold text-gray-800">{claim.donor_name}</dd></div>
-          <div><dt className="font-medium text-gray-500">Item to Claim</dt><dd className="mt-1 break-words font-semibold text-gray-800">{claim.reward.name}</dd>
+          <div><dt className="font-medium text-gray-500">Donor Name</dt><dd className="mt-1 break-words font-semibold text-gray-800">{formatDonorName(claim.donor_name)}</dd></div>
+          <div><dt className="font-medium text-gray-500">Item to Claim</dt><dd className="mt-1 break-words font-semibold text-gray-800">{claim.reward.name}{claim.reward.size ? ` — Size ${claim.reward.size}` : ''}</dd>
             {claim.reward.description && <dd className="mt-1 whitespace-pre-line break-words leading-6 text-gray-600">{claim.reward.description}</dd>}</div>
-          {claim.claim_status === 'pending_claim' && <div><dt className="font-medium text-gray-500">Claim Code</dt><dd className="mt-1 break-all font-mono text-xl font-bold tracking-wider text-[#b7192e]">{state.verifiedCode}</dd></div>}
+          {claim.claim_status === 'pending_claim' && <div><dt className="font-medium text-gray-500">Claim Code</dt><dd className="mt-1 break-all font-mono text-xl font-bold tracking-wider text-primary">{state.verifiedCode}</dd></div>}
           {claim.claim_status === 'claimed' && <div><dt className="font-medium text-gray-500">Claimed</dt><dd className="mt-1 text-gray-800">{claim.claimed_at ? new Date(claim.claimed_at).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : 'Claim date unavailable.'}</dd></div>}
         </dl>
-        {state.modalError && <p role="alert" className="mt-5 text-sm leading-6 text-red-700">{state.modalError}</p>}
+        {state.modalError && <p role="alert" className="mt-5 text-sm leading-6 text-danger-foreground">{state.modalError}</p>}
         {state.refreshing && <p role="status" className="mt-4 text-sm text-gray-500">Checking current claim status...</p>}
         {state.step === 'confirm' ? <div className="mt-6 border-t border-gray-200 pt-5">
           <p className="text-sm font-semibold leading-6 text-gray-800">Confirm that this reward has been handed over to the donor?</p>
           <div className="mt-4 flex flex-wrap justify-end gap-3">
             <button type="button" disabled={busy} onClick={model.cancelConfirmation} className={secondaryButton}>Cancel</button>
-            <button ref={confirmRef} type="button" disabled={busy} onClick={() => void model.confirm()} className={primaryButton}>{state.confirming ? 'Confirming...' : 'Confirm Claim'}</button>
+            <button ref={confirmRef} type="button" disabled={busy} onClick={() => void model.confirm()} className={successButton}>{state.confirming ? 'Confirming...' : 'Confirm Claim'}</button>
           </div>
         </div> : <div className="mt-6">
-          {canConfirmClaim(claim) && !state.blocked ? <button ref={markRef} type="button" disabled={busy} onClick={model.beginConfirmation} className={`${primaryButton} w-full`}>Mark as Claimed</button>
+          {canConfirmClaim(claim) && !state.blocked ? <button ref={markRef} type="button" disabled={busy} onClick={model.beginConfirmation} className={`${successButton} w-full`}>Mark as Claimed</button>
             : <p className="text-sm leading-6 text-gray-500">{claim.claim_status === 'claimed' ? 'This reward has already been claimed. No further confirmation is available.' : 'This claim cannot be confirmed. Check its current status before continuing.'}</p>}
           {state.blocked && claim.claim_status !== 'claimed' && <button type="button" disabled={busy} onClick={() => void model.recheck()} className={`${secondaryButton} mt-4 w-full`}>Check Current Status</button>}
         </div>}

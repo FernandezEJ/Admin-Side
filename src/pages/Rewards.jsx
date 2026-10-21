@@ -1,5 +1,6 @@
 import MonthFilter from '../components/ui/MonthFilter';
 import { useRewards } from '../services/useRewards';
+import { formatDonorName } from '../services/staffNames';
 import { REWARD_CATEGORIES } from '../services/rewardsApi';
 import { filterRedemptions } from '../data/rewardRedemptions';
 import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
@@ -10,7 +11,6 @@ import {
   Plus,
   Search,
   Gift,
-  Package,
   CircleCheck,
   CircleOff,
   Trash2,
@@ -43,10 +43,9 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
 
   const [redemptionSearch, setRedemptionSearch] = useState('');
-  const [redemptionCategory, setRedemptionCategory] = useState('all');
   const [redemptionStatus, setRedemptionStatus] = useState('');
   const [redemptionMonth, setRedemptionMonth] = useState('');
-  const redemptions = filterRedemptions(remote.redemptions, redemptionStatus, redemptionMonth).filter((row) => (redemptionCategory === 'all' || row.category === redemptionCategory) && `${row.donor} ${row.reward}`.toLowerCase().includes(redemptionSearch.toLowerCase()));
+  const redemptions = filterRedemptions(remote.redemptions, redemptionStatus, redemptionMonth).filter((row) => `${row.donor} ${row.reward}`.toLowerCase().includes(redemptionSearch.toLowerCase()));
 
   // ============================================================
   // Helpers
@@ -65,7 +64,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
   const getCount = (status) =>
     rewards.filter((reward) => reward.status === status).length;
 
-  const availableStock = rewards
+  const availableStock = remote.analytics?.summary.active_inventory ?? rewards
     .filter((reward) => reward.status === 'active')
     .reduce((total, reward) => total + reward.stock, 0);
 
@@ -104,7 +103,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
   };
 
   const handleDelete = async (id) => {
-    if (!busy && window.confirm('Move this voucher to Deleted? It can be recovered for 30 days.')) await model.transition(id, 'delete');
+    if (!busy && window.confirm('Move this reward to Deleted? It can be recovered for 30 days.')) await model.transition(id, 'delete');
   };
   const handleRestore = async (id) => {
     if (!busy && window.confirm('Restore this reward to Inactive?')) {
@@ -119,7 +118,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
   const renderRewardStatus = (status) => {
     if (status === 'active') {
       return (
-        <span className="inline-flex rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
+        <span className="inline-flex rounded-full bg-success-surface px-3 py-1.5 text-xs font-semibold text-success-foreground">
           Active
         </span>
       );
@@ -127,14 +126,14 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
 
     if (status === 'inactive') {
       return (
-        <span className="inline-flex rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600">
+        <span className="inline-flex rounded-full bg-neutral-surface px-3 py-1.5 text-xs font-semibold text-neutral-foreground">
           Inactive
         </span>
       );
     }
 
     return (
-      <span className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-red-700">
+      <span className="inline-flex rounded-full bg-danger-surface px-3 py-1.5 text-xs font-semibold text-danger-foreground">
         Deleted
       </span>
     );
@@ -144,16 +143,16 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
   // Redemption Status Badge
   // ============================================================
 
-  const renderRedemptionStatus = (status) => <span className="inline-flex rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600">{({ available: 'Available', active: 'Active', redeemed: 'Redeemed', expired: 'Expired' })[status] ?? status}</span>;
+  const renderRedemptionStatus = (status) => <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${status === 'redeemed' ? 'bg-success-surface text-success-foreground' : 'bg-neutral-surface text-neutral-foreground'}`}>{({ available: 'Available', active: 'Active', redeemed: 'Redeemed', expired: 'Expired' })[status] ?? status}</span>;
 
   return (
-    <div className="flex min-h-screen bg-[#f7f8fa]">
+    <div className="flex min-h-screen bg-page">
       <Sidebar />
 
       <main className="min-w-0 flex-1">
         <Header
           title="Rewards"
-          description="Manage LifeFlow vouchers and donor redemptions."
+          description="Manage LifeFlow rewards and donor redemptions."
         />
 
         <div className="space-y-6 p-4 lg:p-8">
@@ -166,11 +165,11 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
           <section hidden={activeTab === 'analytics'} className={activeTab === 'analytics' ? 'hidden' : 'flex flex-wrap items-center justify-between gap-4'}>
             <div>
               <h2 className="text-lg font-bold text-gray-800">
-                Voucher Management
+                Reward Management
               </h2>
 
               <p className="mt-1 text-sm text-gray-400">
-                Manage voucher values, points, stock,
+                Manage rewards, points, stock,
                 and redemption history.
               </p>
             </div>
@@ -179,10 +178,10 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
               <button
                 type="button"
                 onClick={() => navigate('/rewards/create')}
-                className="flex min-h-11 items-center gap-2 rounded-xl bg-[#b7192e] px-5 text-sm font-semibold text-white transition hover:bg-[#9f1427]"
+                className="flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary-hover"
               >
                 <Plus size={18} />
-              Add Voucher
+              Add Reward
               </button>
             )}
           </section>
@@ -190,23 +189,25 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
           {/* ==================================================
               Summary Cards
               ================================================== */}
-          <section className={activeTab === 'analytics' ? 'hidden' : 'grid gap-4 sm:grid-cols-2 xl:grid-cols-4'}>
+          <section className={activeTab !== 'rewards' ? 'hidden' : 'grid gap-4 sm:grid-cols-2 xl:grid-cols-4'}>
             {[
-              { status: 'active', label: 'Active', icon: CircleCheck, iconClasses: 'bg-green-50 text-green-600' },
+              { status: 'analytics', label: 'Analytics', icon: Gift, iconClasses: 'bg-selected text-primary' },
+              { status: 'active', label: 'Active', icon: CircleCheck, iconClasses: 'bg-success-surface text-success-foreground' },
               { status: 'inactive', label: 'Inactive', icon: CircleOff, iconClasses: 'bg-gray-100 text-gray-500' },
-              { status: 'deleted', label: 'Deleted', icon: Trash2, iconClasses: 'bg-red-50 text-red-600' },
+              { status: 'deleted', label: 'Deleted', icon: Trash2, iconClasses: 'bg-danger-surface text-danger-foreground' },
             ].map(({ status, label, icon: Icon, iconClasses }) => (
               <button key={status} type="button"
                 onClick={() => { setActiveTab('rewards'); setRewardStatusTab(status); }}
-                aria-label={`Show ${label} vouchers`}
+                aria-label={`Show ${label} rewards`}
                 aria-pressed={activeTab === 'rewards' && rewardStatusTab === status}
-                className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-red-200 hover:bg-red-50/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] ${
-                  activeTab === 'rewards' && rewardStatusTab === status ? 'border-red-200 bg-red-50/30' : 'border-gray-200 bg-white'
+                className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-primary-border hover:bg-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                  activeTab === 'rewards' && rewardStatusTab === status ? 'border-primary-border bg-selected' : 'border-gray-200 bg-white'
                 }`}>
                 <span className="flex items-center justify-between gap-3">
                   <span className="min-w-0">
                     <span className="block text-sm font-medium text-gray-500">{label}</span>
-                    <span className="mt-2 block text-2xl font-bold text-gray-900">{getCount(status)}</span>
+                    {status === 'analytics' && <span className="block text-xs text-gray-400">Available Stock</span>}
+                    <span className="mt-2 block text-2xl font-bold text-gray-900">{status === 'analytics' ? availableStock : getCount(status)}</span>
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
                     <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClasses}`}><Icon size={21} aria-hidden="true" /></span>
@@ -216,23 +217,6 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
               </button>
             ))}
 
-            <article className="rounded-2xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    Available Stock
-                  </p>
-
-                  <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {availableStock}
-                  </h3>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-[#b7192e]">
-                  <Package size={21} />
-                </div>
-              </div>
-            </article>
           </section>
 
           {/* ==================================================
@@ -251,7 +235,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                   aria-pressed={activeTab === 'rewards'}
                   className={`border-b-2 pb-4 text-sm font-semibold transition ${
                     activeTab === 'rewards'
-                      ? 'border-[#b7192e] text-[#b7192e]'
+                      ? 'border-primary text-primary'
                       : 'border-transparent text-gray-400 hover:text-gray-700'
                   }`}
                 >
@@ -264,60 +248,24 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                   aria-pressed={activeTab === 'redemptions'}
                   className={`border-b-2 pb-4 text-sm font-semibold transition ${
                     activeTab === 'redemptions'
-                      ? 'border-[#b7192e] text-[#b7192e]'
+                      ? 'border-primary text-primary'
                       : 'border-transparent text-gray-400 hover:text-gray-700'
                   }`}
                 >
                   Redemptions
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('analytics')}
-                  aria-pressed={activeTab === 'analytics'}
-                  aria-controls="rewards-analytics"
-                  className={`border-b-2 pb-4 text-sm font-semibold transition ${
-                    activeTab === 'analytics'
-                      ? 'border-[#b7192e] text-[#b7192e]'
-                      : 'border-transparent text-gray-400 hover:text-gray-700'
-                  }`}
-                >
-                  Analytics
                 </button>
                 {canVerifyClaims && <button
                   type="button"
                   onClick={() => setActiveTab('claims')}
                   aria-pressed={activeTab === 'claims'}
                   aria-controls="reward-claim-verification"
-                  className={`border-b-2 pb-4 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] ${activeTab === 'claims' ? 'border-[#b7192e] text-[#b7192e]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+                  className={`border-b-2 pb-4 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${activeTab === 'claims' ? 'border-primary text-primary' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
                 >Claim Verification</button>}
               </div>
 
-              {/* Reward status filters */}
-              {activeTab === 'rewards' && (
-                <div className="flex gap-5">
-                  {[
-                    ['active', 'Active'],
-                    ['inactive', 'Inactive'],
-                    ['deleted', 'Deleted'],
-                  ].map(([id, label]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setRewardStatusTab(id)}
-                      className={`border-b-2 pb-4 text-sm font-semibold transition ${
-                        rewardStatusTab === id
-                          ? 'border-[#b7192e] text-[#b7192e]'
-                          : 'border-transparent text-gray-400 hover:text-gray-700'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
 
-            <div id="rewards-analytics" hidden={activeTab !== 'analytics'}>
+            <div id="rewards-analytics" hidden={activeTab !== 'rewards' || rewardStatusTab !== 'analytics'}>
               <RewardsAnalytics remote={remote} />
             </div>
             {activeTab === 'claims' && canVerifyClaims && <ClaimVerification key={currentAdmin?.id ?? role} onClaimed={model.refreshClaims} />}
@@ -325,7 +273,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
             {/* ==================================================
                 Rewards Tab
                 ================================================== */}
-            {activeTab === 'rewards' && (
+            {activeTab === 'rewards' && rewardStatusTab !== 'analytics' && (
               <>
                 {/* Search and Filters */}
                 <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">
@@ -341,8 +289,8 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                       onChange={(event) =>
                         setSearchTerm(event.target.value)
                       }
-                      placeholder="Search vouchers..."
-                      className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm outline-none transition focus:border-[#b7192e] focus:bg-white"
+                      placeholder="Search rewards..."
+                      className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm outline-none transition focus:border-primary focus:bg-white"
                     />
                   </div>
 
@@ -352,7 +300,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                     onChange={(event) =>
                       setSelectedCategory(event.target.value)
                     }
-                    className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"
+                    className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-primary"
                   >
                     <option value="all">
                       All Categories
@@ -385,7 +333,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                         {/* Temporary image placeholder */}
                         <div className="flex h-44 items-center justify-center bg-gray-100">
                           {reward.image_url ? <img src={reward.image_url} alt={reward.name} className="h-full w-full object-cover" /> : <>
-                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#b7192e] shadow-sm">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
                             <Gift size={27} />
                           </div></>}
                         </div>
@@ -394,7 +342,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                                LIFEFLOW VOUCHER
+                                LIFEFLOW REWARDS
                               </p>
 
                               <h3 className="mt-1 font-bold text-gray-800">
@@ -413,7 +361,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                                 Points Required
                               </p>
 
-                              <p className="mt-1 font-bold text-[#b7192e]">
+                              <p className="mt-1 font-bold text-primary">
                                 {reward.pointsRequired}
                               </p>
                             </div>
@@ -438,7 +386,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                                   title="Edit reward"
                                   disabled={busy}
                                   onClick={() => navigate(`/rewards/${reward.id}/edit`)}
-                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-[#b7192e]"
+                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-selected hover:text-primary"
                                 >
                                   <Pencil size={17} />
                                 </button>
@@ -449,7 +397,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                                   onClick={() =>
                                     handleDelete(reward.id)
                                   }
-                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-danger-surface hover:text-danger-foreground"
                                 >
                                   <Trash2 size={17} />
                                 </button>
@@ -463,7 +411,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                                 onClick={() =>
                                   handleRestore(reward.id)
                                 }
-                                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-green-50 hover:text-green-600"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-success-surface hover:text-success-foreground"
                               >
                                 <RotateCcw size={17} />
                               </button>
@@ -473,7 +421,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                       </article>
                     ))
                   ) : (
-                    <div className="col-span-full"><EmptyState title="No vouchers found" /></div>
+                    <div className="col-span-full"><EmptyState title="No rewards found" /></div>
                   )}
                 </div>
               </>
@@ -484,11 +432,10 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                 ================================================== */}
             {activeTab === 'redemptions' && (<>
               <div className="flex flex-wrap items-end gap-4 border-b border-gray-200 p-4">
-                <label className="text-sm text-gray-600">Status<select aria-label="Redemption status" value={redemptionStatus} onChange={(event) => setRedemptionStatus(event.target.value)} className="mt-2 block h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"><option value="">All statuses</option><option value="available">Available</option><option value="redeemed">Redeemed</option><option value="expired">Expired</option></select></label>
                 <label className="text-sm text-gray-600">Search<input aria-label="Search redemptions" value={redemptionSearch} onChange={(event) => setRedemptionSearch(event.target.value)} className="mt-2 block h-11 rounded-xl border border-gray-200 px-4" /></label>
-                <label className="text-sm text-gray-600">Category<select aria-label="Redemption category" value={redemptionCategory} onChange={(event) => setRedemptionCategory(event.target.value)} className="mt-2 block h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-[#b7192e]"><option value="all">All Categories</option>{REWARD_CATEGORIES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</select></label>
+                <label className="text-sm text-gray-600">Status<select aria-label="Redemption status" value={redemptionStatus} onChange={(event) => setRedemptionStatus(event.target.value)} className="mt-2 block h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-primary"><option value="">All statuses</option><option value="available">Available</option><option value="redeemed">Redeemed</option><option value="expired">Expired</option></select></label>
                 <MonthFilter value={redemptionMonth} onChange={setRedemptionMonth} />
-                <button type="button" onClick={() => { setRedemptionSearch(''); setRedemptionCategory('all'); setRedemptionStatus(''); setRedemptionMonth(''); }} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e]">Clear</button>
+                <button type="button" onClick={() => { setRedemptionSearch(''); setRedemptionStatus(''); setRedemptionMonth(''); }} className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">Clear</button>
               </div>
               <div className="w-full overflow-x-auto">
                 <table className="w-full min-w-[640px] table-fixed text-left">
@@ -499,7 +446,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                       </th>
 
                       <th className="w-[30%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                        Voucher
+                        Reward
                       </th>
 
                       <th className="w-[14%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -523,11 +470,11 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                         className="border-b border-gray-100 last:border-0"
                       >
                         <td className="break-words px-5 py-5 font-semibold text-gray-800">
-                          {redemption.donor}
+                          {formatDonorName(redemption.donor)}
                         </td>
 
                         <td className="break-words px-3 py-5 text-sm text-gray-500">
-                          {redemption.reward}
+                          {redemption.reward}{redemption.size ? ` — Size ${redemption.size}` : ''}
                         </td>
 
                         <td className="px-3 py-5 text-sm font-semibold text-gray-700">

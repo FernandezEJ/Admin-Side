@@ -10,8 +10,8 @@
   overflow: hidden;
   border: 0;
   border-radius: 16px;
-  background: #fafafa;
-  color: #111827;
+  background: var(--color-surface);
+  color: var(--color-content);
   box-shadow: 0 16px 48px #00000030;
   font-size: 12px;
 }
@@ -20,61 +20,61 @@
 .verification-review-header {
   display: flex; flex: none; align-items: flex-start; justify-content: space-between;
   gap: 12px; min-height: 76px; padding: 16px 20px;
-  border-bottom: 1px solid #e5e7eb; background: #fff;
+  border-bottom: 1px solid var(--color-line); background: var(--color-surface);
 }
 .verification-review-header h2 { margin: 0; font-size: 20px; font-weight: 700; line-height: 26px; }
-.verification-review-header p { margin: 3px 0 0; font-size: 12px; line-height: 18px; color: #52525b; }
+.verification-review-header p { margin: 3px 0 0; font-size: 12px; line-height: 18px; color: var(--color-neutral); }
 .verification-review-header button { display: grid; flex: none; place-items: center; width: 26px; height: 26px; margin: -3px -5px 0 0; border-radius: 5px; }
-.verification-review-header button:hover { background: #f3f4f6; }
+.verification-review-header button:hover { background: var(--color-neutral-surface); }
 .verification-review-content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 20px; }
 .verification-review-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; gap: 16px; }
 .verification-review-information { display: grid; min-width: 0; gap: 16px; }
-.verification-review-card { min-width: 0; margin: 0; padding: 16px; border: 1px solid #e2e3e7; border-radius: 12px; background: #fff; }
-.verification-review-card h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 12px; font-size: 14px; font-weight: 600; line-height: 20px; color: #111; }
-.verification-review-card dt { font-size: 10px; line-height: 14px; text-transform: uppercase; color: #52525b; }
+.verification-review-card { min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-surface); }
+.verification-review-card h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 12px; font-size: 14px; font-weight: 600; line-height: 20px; color: var(--color-content); }
+.verification-review-card dt { font-size: 10px; line-height: 14px; text-transform: uppercase; color: var(--color-neutral); }
 .verification-review-card dd { margin: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 20px; }
 .verification-review-card .verification-donor-name > dd:first-of-type { font-size: 14px; }
 .verification-review-card .verification-donor-email { font-size: 12px; line-height: 18px; }
 .verification-donor-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 17px; }
 .verification-review-card .verification-donor-meta dd { font-size: 12px; }
-.verification-review-card .verification-donor-blood { color: #a52a39; font-weight: 700; }
+.verification-review-card .verification-donor-blood { color: var(--color-primary); font-weight: 700; }
 .verification-donation-card h3 { margin-bottom: 3px; }
 .verification-donation-title { margin: 0; overflow-wrap: anywhere; font-size: 14px; line-height: 20px; font-weight: 600; }
 .verification-donation-line { display: flex; align-items: flex-start; gap: 6px; margin: 6px 0 0; font-size: 12px; line-height: 18px; }
 .verification-donation-line svg { flex: none; margin-top: 1px; }
 .verification-donation-line span { min-width: 0; overflow-wrap: anywhere; }
 .verification-submitted-proof h3 { margin-bottom: 10px; }
-.verification-proof-viewer { position: relative; margin-top: 0; border: 1px solid #e5e7eb; background: #f8f8f7; }
+.verification-proof-viewer { position: relative; margin-top: 0; border: 1px solid var(--color-line); background: var(--color-page); }
 .verification-proof-toolbar { position: absolute; z-index: 1; inset: 4px 4px auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; pointer-events: none; }
-.verification-proof-filename { min-width: 0; max-width: calc(100% - 50px); overflow: hidden; padding: 2px 4px; border-radius: 3px; background: #333e; color: #fff; font-size: 8px; line-height: 13px; white-space: nowrap; text-overflow: ellipsis; }
+.verification-proof-filename { min-width: 0; max-width: calc(100% - 50px); overflow: hidden; padding: 2px 4px; border-radius: 3px; background: #333e; color: var(--color-surface); font-size: 8px; line-height: 13px; white-space: nowrap; text-overflow: ellipsis; }
 .verification-proof-toolbar > div { display: flex; flex: none; gap: 3px; margin-left: auto; pointer-events: auto; }
-.verification-proof-toolbar button { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid #ffffff50; border-radius: 3px; background: #333d; color: #fff; }
-.verification-proof-toolbar button:hover { background: #111; }
+.verification-proof-toolbar button { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid #ffffff50; border-radius: 3px; background: #333d; color: var(--color-surface); }
+.verification-proof-toolbar button:hover { background: var(--color-content); }
 .verification-proof-viewport { max-height: max(180px, calc(90dvh - 210px)); overflow: auto; overscroll-behavior: contain; }
 .verification-proof-stage { position: relative; min-height: 1px; }
 .verification-proof-stage img { position: absolute; left: 50%; top: 50%; display: block; max-width: none; height: auto; }
 .verification-proof-pdf { margin-top: 6px; }
-.verification-proof-pdf iframe { display: block; width: 100%; height: 340px; border: 1px solid #e5e7eb; }
+.verification-proof-pdf iframe { display: block; width: 100%; height: 340px; border: 1px solid var(--color-line); }
 .verification-proof-pdf-name { overflow-wrap: anywhere; margin-bottom: 5px; font-size: 10px; }
 .verification-proof-pdf a, .verification-review-message button, .verification-review-error button { display: inline-block; margin-top: 6px; font-weight: 600; text-decoration: underline; }
 .verification-review-message, .verification-review-error { padding: 12px 0; font-size: 12px; line-height: 18px; }
-.verification-review-error { color: #b7192e; overflow-wrap: anywhere; }
+.verification-review-error { color: var(--color-danger); overflow-wrap: anywhere; }
 .verification-review-error button { display: block; }
-.verification-review-outcome { margin-top: 12px; border-top: 1px solid #e5e7eb; padding-top: 10px; font-size: 11px; line-height: 17px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.verification-review-outcome { margin-top: 12px; border-top: 1px solid var(--color-line); padding-top: 10px; font-size: 11px; line-height: 17px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .verification-review-outcome p + p { margin-top: 5px; }
-.verification-review-footer { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: 8px; min-height: 64px; padding: 12px 20px; border-top: 1px solid #e5e7eb; background: #fff; }
-.verification-review-footer > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 40px; padding: 8px 14px; border: 1px solid #e1e1e6; border-radius: 8px; font-size: 12px; line-height: 18px; white-space: nowrap; transition: background-color 120ms; }
+.verification-review-footer { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: 8px; min-height: 64px; padding: 12px 20px; border-top: 1px solid var(--color-line); background: var(--color-surface); }
+.verification-review-footer > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 40px; padding: 8px 14px; border: 1px solid var(--color-line); border-radius: 8px; font-size: 12px; line-height: 18px; white-space: nowrap; transition: background-color 120ms; }
 .verification-review-footer > button svg { flex: none; }
-.verification-decision-revision { color: #272727; background: #fff; }
-.verification-decision-revision svg { color: #b48c42; }
-.verification-decision-revision:hover { background: #fffbeb; }
-.verification-review-footer > .verification-decision-reject { border-color: #e4b9bf; color: #80313c; background: #fff; }
-.verification-decision-reject:hover { background: #fff1f2; }
-.verification-review-footer > .verification-decision-approve { border-color: #15803d; background: #15803d; color: #fff; }
-.verification-decision-approve:hover { background: #166534; }
+.verification-decision-revision { color: var(--color-warning-foreground); background: var(--color-surface); }
+.verification-decision-revision svg { color: var(--color-warning); }
+.verification-decision-revision:hover { background: var(--color-warning-surface); }
+.verification-review-footer > .verification-decision-reject { border-color: var(--color-danger-border); color: var(--color-danger); background: var(--color-surface); }
+.verification-decision-reject:hover { background: var(--color-danger-surface); }
+.verification-review-footer > .verification-decision-approve { border-color: var(--color-success); background: var(--color-success); color: var(--color-surface); }
+.verification-decision-approve:hover { background: var(--color-success-hover); }
 .verification-review-modal button:disabled { cursor: not-allowed; opacity: 0.5; }
-.verification-review-readonly { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; font-size: 11px; line-height: 16px; color: #6b7280; }
-.verification-review-readonly button { border: 1px solid #e5e7eb; border-radius: 7px; padding: 6px 10px; font-weight: 600; color: #374151; }
+.verification-review-readonly { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; font-size: 11px; line-height: 16px; color: var(--color-neutral); }
+.verification-review-readonly button { border: 1px solid var(--color-line); border-radius: 7px; padding: 6px 10px; font-weight: 600; color: var(--color-neutral-foreground); }
 @media (max-width: 720px) {
   .verification-review-modal { width: calc(100vw - 24px); height: calc(100dvh - 24px); max-height: calc(100dvh - 24px); }
   .verification-review-grid { grid-template-columns: minmax(0, 1fr); }

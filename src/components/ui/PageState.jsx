@@ -9,11 +9,11 @@ export function EmptyState({ title = 'No records found', description = 'Try chan
 }
 
 export function ErrorState({ title = 'Unable to display this page', description = 'Please try again.', onRetry }) {
-  return <div role="alert" className="rounded-xl border border-red-100 bg-white p-6">
-    <CircleAlert size={24} className="mb-3 text-[#b7192e]" />
+  return <div role="alert" className="rounded-xl border border-danger-border bg-white p-6">
+    <CircleAlert size={24} className="mb-3 text-danger" />
     <h2 className="font-bold text-gray-800">{title}</h2>
     <p className="mt-2 text-sm text-gray-600">{description}</p>
-    {onRetry && <button type="button" onClick={onRetry} className="mt-4 rounded-lg bg-[#b7192e] px-4 py-2 text-sm font-semibold text-white">Try again</button>}
+    {onRetry && <button type="button" onClick={onRetry} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Try again</button>}
   </div>;
 }
 

@@ -6,5 +6,4 @@ export const adminManagementApi = {
   update: (token, id, { name, email }) => adminRequest(`/admins/${id}`, { token, method: 'PUT', body: { name, email } }),
   deactivate: (token, id) => adminRequest(`/admins/${id}/deactivate`, { token, method: 'POST' }),
   reactivate: (token, id) => adminRequest(`/admins/${id}/reactivate`, { token, method: 'POST' }),
-  reset: (token, id) => adminRequest(`/admins/${id}/send-password-reset`, { token, method: 'POST' }),
 };

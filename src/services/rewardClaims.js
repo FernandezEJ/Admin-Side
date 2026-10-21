@@ -18,7 +18,7 @@ function readClaim(response) {
       typeof claim.claim_status !== 'string' || typeof claim.can_claim !== 'boolean' ||
       !(claim.claimed_at === null || (typeof claim.claimed_at === 'string' && Number.isFinite(Date.parse(claim.claimed_at))))) throw invalidResponse();
   return { voucher_id: claim.voucher_id, donor_name: claim.donor_name,
-    reward: { name: claim.reward.name, description: typeof claim.reward.description === 'string' ? claim.reward.description : '' },
+    reward: { name: claim.reward.name, size: typeof claim.reward.size === 'string' ? claim.reward.size : null, description: typeof claim.reward.description === 'string' ? claim.reward.description : '' },
     claim_status: claim.claim_status, can_claim: claim.can_claim, claimed_at: claim.claimed_at };
 }
 

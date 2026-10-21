@@ -33,9 +33,9 @@ export default function RewardsAnalytics({ remote }) {
             <LoaderCircle size={16} aria-label="Refreshing analytics" aria-hidden={!analyticsLoading} className={analyticsLoading ? 'animate-spin text-gray-400' : 'text-gray-400 opacity-0'} />
           </div>
           <div role="group" aria-label="Analytics year" className="ml-auto flex h-11 shrink-0 items-center rounded-xl border border-gray-200 bg-white">
-            <button type="button" aria-label="Previous year" disabled={Number(year) <= 2000} onClick={() => model.loadAnalytics(String(Number(year) - 1))} className="flex h-full w-11 items-center justify-center rounded-l-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] disabled:cursor-not-allowed disabled:opacity-50"><ChevronDown size={18} aria-hidden="true" /></button>
+            <button type="button" aria-label="Previous year" disabled={Number(year) <= 2000} onClick={() => model.loadAnalytics(String(Number(year) - 1))} className="flex h-full w-11 items-center justify-center rounded-l-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"><ChevronDown size={18} aria-hidden="true" /></button>
             <span className="w-16 text-center text-sm font-semibold tabular-nums text-gray-700">{year}</span>
-            <button type="button" aria-label="Next year" disabled={Number(year) >= currentYear + 1} onClick={() => model.loadAnalytics(String(Number(year) + 1))} className="flex h-full w-11 items-center justify-center rounded-r-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b7192e] disabled:cursor-not-allowed disabled:opacity-50"><ChevronUp size={18} aria-hidden="true" /></button>
+            <button type="button" aria-label="Next year" disabled={Number(year) >= currentYear + 1} onClick={() => model.loadAnalytics(String(Number(year) + 1))} className="flex h-full w-11 items-center justify-center rounded-r-xl text-gray-600 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"><ChevronUp size={18} aria-hidden="true" /></button>
           </div>
         </div>
         {!summary.total_redemptions ? <EmptyState title="No redemptions for this year" /> : <>
@@ -45,7 +45,7 @@ export default function RewardsAnalytics({ remote }) {
                     <CartesianGrid
                       strokeDasharray="3 3"
                       vertical={false}
-                      stroke="#eeeeee"
+                      stroke="var(--color-line)"
                     />
 
                     <XAxis
@@ -54,7 +54,7 @@ export default function RewardsAnalytics({ remote }) {
                       axisLine={false}
                       tickLine={false}
                       tick={{
-                        fill: '#9ca3af',
+                        fill: 'var(--color-neutral)',
                         fontSize: 12,
                       }}
                     />
@@ -64,18 +64,18 @@ export default function RewardsAnalytics({ remote }) {
                       tickLine={false}
                       allowDecimals={false}
                       tick={{
-                        fill: '#9ca3af',
+                        fill: 'var(--color-neutral)',
                         fontSize: 12,
                       }}
                     />
 
                     <Tooltip
                       cursor={{
-                        fill: '#fff5f6',
+                        fill: 'var(--color-selected)',
                       }}
                       contentStyle={{
                         borderRadius: '10px',
-                        border: '1px solid #eeeeee',
+                        border: '1px solid var(--color-line)',
                         fontSize: '12px',
                       }}
                     />
@@ -83,7 +83,7 @@ export default function RewardsAnalytics({ remote }) {
                     <Bar
                       dataKey="redemptions"
                       name="Redeemed"
-                      fill="#b7192e"
+                      fill="var(--color-primary)"
                       radius={[6, 6, 0, 0]}
                       maxBarSize={42}
                     />

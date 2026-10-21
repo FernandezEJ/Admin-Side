@@ -1,12 +1,19 @@
 import { adminRequest } from './adminAuthApi';
 
-export const rewardRow = (item) => ({ ...item, voucherValue: Number(item.voucher_value), pointsRequired: item.points_cost, stock: item.stock_quantity });
+export const rewardRow = (item) => ({ ...item, voucherValue: item.voucher_value == null ? null : Number(item.voucher_value), pointsRequired: item.points_cost, stock: item.stock_quantity });
 export const REWARD_CATEGORIES = [
+  { value: 'merchandise', label: 'Merchandise' },
+  { value: 'apparel', label: 'Apparel' },
+  { value: 'vouchers', label: 'Vouchers' },
+];
+export const APPAREL_SIZES = ['S', 'M', 'L', 'XL', '2XL'];
+export const LEGACY_CATEGORIES = [
   { value: 'grocery', label: 'Grocery' },
   { value: 'medicine', label: 'Medicine' },
   { value: 'fitness', label: 'Fitness' },
   { value: 'other', label: 'Other' },
 ];
+export const FILTER_CATEGORIES = [...REWARD_CATEGORIES, ...LEGACY_CATEGORIES];
 export const rewardsApi = {
   list: async (token) => (await adminRequest('/rewards', { token })).data.map(rewardRow),
   detail: async (token, id) => rewardRow((await adminRequest(`/rewards/${id}`, { token })).reward),
@@ -14,7 +21,10 @@ export const rewardsApi = {
   analytics: (token, year) => adminRequest(`/rewards/analytics?${new URLSearchParams({ year })}`, { token }),
   save: async (token, data, id) => {
     const body = new FormData();
-    for (const [key, value] of Object.entries(data)) if (value !== null && value !== undefined) body.append(key, value);
+    for (const [key, value] of Object.entries(data)) {
+      if (key === 'variants') value.forEach((variant, index) => Object.entries(variant).forEach(([field, entry]) => body.append(`variants[${index}][${field}]`, entry)));
+      else if (value !== null && value !== undefined) body.append(key, value);
+    }
     if (id) body.append('_method', 'PUT');
     return rewardRow((await adminRequest(id ? `/rewards/${id}` : '/rewards', { token, method: 'POST', body })).reward);
   },
@@ -23,11 +33,12 @@ export const rewardsApi = {
 
 export function validateReward(data) {
   if (!data.name.trim()) return 'Enter a reward name.';
-  if (!REWARD_CATEGORIES.some(({ value }) => value === data.category)) return 'Choose a voucher category.';
+  if (!FILTER_CATEGORIES.some(({ value }) => value === data.category)) return 'Choose a reward category.';
   const amount = Number(data.voucher_value);
-  if (!(amount > 0 && amount <= 100000) || !/^\d+(\.\d{1,2})?$/.test(String(data.voucher_value))) return 'Enter a voucher value from 0.01 to 100,000 with up to two decimal places.';
+  if (data.category === 'vouchers' && (!(amount > 0 && amount <= 100000) || !/^\d+(\.\d{1,2})?$/.test(String(data.voucher_value)))) return 'Enter a voucher value from 0.01 to 100,000 with up to two decimal places.';
   if (!Number.isInteger(Number(data.points_cost)) || Number(data.points_cost) < 1 || Number(data.points_cost) > 2147483647) return 'Points cost must be a positive whole number.';
   if (data.stock_quantity === '' || !Number.isInteger(Number(data.stock_quantity)) || Number(data.stock_quantity) < 0 || Number(data.stock_quantity) > 2147483647) return 'Stock must be a non-negative whole number.';
+  if (data.category === 'apparel' && (!data.variants?.length || data.variants.length > 5 || new Set(data.variants.map(row => row.size)).size !== data.variants.length || data.variants.some(row => !APPAREL_SIZES.includes(row.size) || row.stock_quantity === '' || !Number.isInteger(Number(row.stock_quantity)) || Number(row.stock_quantity) < 0 || Number(row.stock_quantity) > 429496729))) return 'Offer at least one size and enter a non-negative whole quantity for each enabled size.';
   if (data.image && (!['image/jpeg', 'image/png'].includes(data.image.type) || data.image.size > 5 * 1024 * 1024)) return 'Choose a JPG or PNG up to 5 MB.';
   return '';
 }

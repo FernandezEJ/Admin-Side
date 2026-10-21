@@ -79,13 +79,13 @@ export async function checkVerifications(server) {
         const selectedIndex = cards.indexOf(selected[0]);
         const tabs = nodes.filter((node) => node.type === 'button' && labels.includes(node.props.children));
         assert.equal(tabs.length, 4);
-        assert.ok(tabs[selectedIndex].props.className.includes('border-[#b7192e] text-[#b7192e]'), 'Cards and tabs use the same selected state');
+        assert.ok(tabs[selectedIndex].props.className.includes('border-primary text-primary'), 'Cards and tabs use the same selected state');
         assert.ok(!nodes.some((node) => node.props.children === 'Pending' || node.props['aria-label']?.includes('Pending')));
         cards.forEach((card, index) => {
           assert.equal(card.props.type, 'button', 'Native buttons support keyboard activation');
           assert.equal(card.props['aria-label'], `Show ${labels[index]} records`);
           assert.ok(card.props.className.includes('cursor-pointer') && card.props.className.includes('hover:') && card.props.className.includes('focus-visible:'));
-          assert.ok(card.props.className.includes(card.props['aria-pressed'] ? 'border-red-200 bg-red-50/30' : 'border-gray-200 bg-white'));
+          assert.ok(card.props.className.includes(card.props['aria-pressed'] ? 'border-primary-border bg-selected' : 'border-gray-200 bg-white'));
           const content = descendants(card);
           assert.equal(content.find((node) => node.type === 'span' && node.props.className?.includes('text-2xl')).props.children, index + 1,
             'Each status count is distinct and unchanged by search/date filters or Pending records');
@@ -299,6 +299,8 @@ export async function checkVerifications(server) {
         } else {
           form = nodes.find((node) => node.type === 'form');
           assert.ok(form); assert.equal(panel.props.locked, true);
+          const confirm = nodes.find((node) => node.type === 'button' && node.props.type === 'submit');
+          assert.ok(confirm.props.className.includes(`bg-${action === 'approve' ? 'success' : action === 'needs-revision' ? 'warning' : 'danger'} `));
           if (action !== 'approve') assert.equal(nodes.find((node) => node.type === 'textarea').props.required, true);
         }
         return panel;
