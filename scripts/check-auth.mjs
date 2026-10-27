@@ -9,6 +9,7 @@ import { checkRealAuth } from './check-real-auth.mjs';
 import { checkLoginRecovery } from './check-login-recovery.mjs';
 import { checkAdminManagement } from './check-admin-management.mjs';
 import { checkAnnouncements } from './check-announcements.mjs';
+import { checkEducation } from './check-education.mjs';
 import { checkVerifications } from './check-verifications.mjs';
 import { checkDashboard } from './check-dashboard.mjs';
 import { checkRewards } from './check-rewards.mjs';
@@ -18,27 +19,41 @@ import { checkDonorNames } from './check-donor-names.mjs';
 import { checkAuditLogs } from './check-audit-logs.mjs';
 import { checkSystemReports } from './check-system-reports.mjs';
 import { checkSidebar } from './check-sidebar.mjs';
+import { checkPageStates } from './check-page-states.mjs';
+import { checkUiConsistency } from './check-ui-consistency.mjs';
 
 const server = await createServer({ server: { middlewareMode: true } });
+// The small approved Flowie derivative is served directly; do not inline the 2 MB source SVG.
+const brandingHtml = readFileSync('index.html', 'utf8');
+assert.match(brandingHtml, /<title>LifeFlow<\/title>/);
+assert.match(brandingHtml, /<link rel="icon" type="image\/png" sizes="64x64" href="\/flowie-favicon\.png"/);
+const favicon = readFileSync('public/flowie-favicon.png');
+assert.equal(favicon.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+assert.equal(favicon.readUInt32BE(16),64);assert.equal(favicon.readUInt32BE(20),64);
+assert.ok(favicon.length<15000 && !brandingHtml.includes('data:image'),'Small favicon without inline raster data');
+assert.ok(existsSync('src/assets/icon.svg'),'Original official SVG is retained');
 // Palette checks stay in the existing runner; no browser or live API is simulated here.
 function checkColorPalette() {
   const css = readFileSync('src/index.css', 'utf8');
   const tokens = Object.fromEntries([...css.matchAll(/--color-([\w-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim()]));
   const approved = {
-    primary: '#9B1238', danger: '#B42318', success: '#15803D', warning: '#B45309', info: '#1D4ED8', neutral: '#64748B',
-    page: '#F8FAFC', surface: '#FFFFFF', content: '#0F172A', line: '#E2E8F0', selected: '#FFF1F3',
+    'floral-white': '#FFF9F2', 'pastel-pink': '#FFCAD0', 'racing-red': '#F10222', 'crushed-berry': '#892325', 'rich-mahogany': '#250202',
+    primary: '#892325', danger: '#B42318', success: '#15803D', warning: '#B45309', info: '#1D4ED8', neutral: '#5F6B7A',
+    page: '#FFF9F2', surface: '#FFFFFF', content: '#250202', line: '#E2E8F0', selected: '#FFCAD0',
+    sidebar: '#892325', 'sidebar-text': '#FFF9F2', 'sidebar-muted': '#FFCAD0', 'sidebar-hover': '#701C1E',
     'success-surface': '#ECFDF3', 'success-foreground': '#166534', 'warning-surface': '#FFF7E6', 'warning-foreground': '#92400E',
     'danger-surface': '#FEF3F2', 'danger-foreground': '#B42318', 'info-surface': '#EFF6FF', 'info-foreground': '#1D4ED8',
     'neutral-surface': '#F1F5F9', 'neutral-foreground': '#475569',
   };
-  for (const [name, value] of Object.entries(approved)) assert.equal(tokens[name], value, `Approved ${name}`);
   const resolve = name => tokens[name].startsWith('var(') ? resolve(tokens[name].match(/--color-([\w-]+)/)[1]) : tokens[name];
+  for (const [name, value] of Object.entries(approved)) assert.equal(resolve(name), value, `Approved ${name}`);
   const luminance = name => {
     const channels = resolve(name).slice(1).match(/../g).map(hex => parseInt(hex, 16) / 255)
       .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
     return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
   };
-  const pairs = [['content', 'page'], ['neutral', 'page'], ['neutral', 'surface'], ['primary', 'selected'], ['neutral-foreground', 'selected']];
+  const pairs = [['content', 'page'], ['neutral', 'page'], ['neutral', 'surface'], ['primary', 'selected'], ['neutral-foreground', 'selected'],
+    ['sidebar-text', 'sidebar'], ['sidebar-muted', 'sidebar'], ['sidebar-text', 'sidebar-hover'], ['sidebar-muted', 'sidebar-hover']];
   for (const semantic of ['primary', 'danger', 'success', 'warning', 'info']) pairs.push(['surface', semantic], ['surface', `${semantic}-hover`]);
   for (const semantic of ['danger', 'success', 'warning', 'info', 'neutral']) pairs.push([`${semantic}-foreground`, `${semantic}-surface`]);
   for (const [foreground, background] of pairs) {
@@ -48,10 +63,18 @@ function checkColorPalette() {
   for (const shade of [400, 500, 600]) assert.equal(resolve(`gray-${shade}`), approved.neutral);
   assert.equal(resolve('gray-200'), approved.line);
   assert.ok(css.includes(':focus-visible') && css.includes('border-color: var(--color-danger)'));
+  assert.ok(css.includes('prefers-reduced-motion: reduce') && css.includes('transition-duration: 0s !important'));
+  assert.ok(css.includes("--font-sans: 'Nunito Sans'") && css.includes('font-synthesis: none'));
+  assert.ok(css.includes('--font-weight-extrabold: 700') && css.includes('--font-weight-black: 700'));
+  const fontLink = readFileSync('index.html', 'utf8');
+  assert.ok(fontLink.includes('Nunito+Sans:wght@400;500;600;700&display=swap'), 'All UI weights load without blocking text');
   const review = readFileSync('src/styles/verification-review.css', 'utf8');
   for (const semantic of ['success', 'warning', 'danger']) assert.ok(review.includes(`var(--color-${semantic})`));
   const sidebar = readFileSync('src/styles/sidebar.css', 'utf8');
-  assert.ok(sidebar.includes('.sidebar-link.is-active { background: var(--color-selected); color: var(--color-primary); }'));
+  assert.match(sidebar, /\.sidebar-link\.is-active\s*\{[^}]*background: var\(--color-selected\);[^}]*color: var\(--color-primary\);/u);
+  assert.match(sidebar, /\.sidebar-link:hover\s*\{[^}]*background: var\(--color-sidebar-hover\)/u);
+  assert.match(sidebar, /\.lifeflow-sidebar :focus-visible\s*\{[^}]*outline-color: var\(--color-sidebar-text\)/u);
+  assert.ok(sidebar.includes('background: var(--color-sidebar)') && sidebar.includes('object-fit: contain'));
   process.stdout.write(`Palette checks passed: ${Object.keys(approved).length} approved tokens, ${pairs.length} AA text pairs, legacy neutral aliases, semantic review actions, sidebar selection and error/focus colors.\n`);
 }
 const storage = () => {
@@ -202,7 +225,7 @@ try {
   assert.equal(filterAuditLogs(mockAuditLogs, '', 'Rewards').length, 1);
   assert.equal(filterAuditLogs(mockAuditLogs, 'no-match').length, 0);
   const routes = createRoutesFromElements(AppRoutes().props.children);
-  const normalPaths = ['/dashboard', '/announcements', '/verification', '/donors', '/rewards'];
+  const normalPaths = ['/dashboard', '/announcements', '/educational-content', '/verification', '/donors', '/rewards'];
   const restrictedPages = [
     ['/system-reports', 'System Reports'],
     ['/admin-management', 'Admin Management'],
@@ -332,6 +355,7 @@ try {
   await checkLoginRecovery(server);
   await checkAdminManagement(server);
   await checkAnnouncements(server);
+  await checkEducation(server);
   await checkVerifications(server);
   await checkDashboard(server);
   await checkRewards(server);
@@ -341,6 +365,8 @@ try {
   await checkAuditLogs(server);
   await checkSystemReports(server);
   await checkSidebar(server);
+  await checkPageStates(server);
+  await checkUiConsistency(server);
   assert.equal(hasRole('unknown'), false);
   assert.equal(hasRole(ADMIN_ROLES.ADMIN, []), false);
   process.stdout.write('Auth/navigation checks passed: both sidebars, protected routes, restricted pages, legacy URLs, persistence, logout, invalid sessions.\n');

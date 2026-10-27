@@ -78,7 +78,7 @@ export async function checkAuditLogs(server) {
     assert.equal(calls.length, count, 'Invalid page changes do not request data');
     reply = second;
     const next = model.setPage(2);
-    assert.ok(render(remote()).includes('Loading page') && !render(remote()).includes('Alice Reviewer'));
+    assert.ok(!render(remote()).includes('Loading page') && render(remote()).includes('Alice Reviewer'), 'Keep previous audit page during refresh');
     await model.setPage(2);
     assert.equal(calls.length, count + 1, 'Pending pagination cannot be double-submitted');
     await next;
@@ -114,7 +114,7 @@ export async function checkAuditLogs(server) {
     status = 503; reply = { message: 'Private trace' };
     await model.load();
     html = render(remote());
-    assert.ok(html.includes('Unable to load Audit Logs') && html.includes('Try again'));
+    assert.ok(html.includes('Something went wrong on our side') && html.includes('Try again'));
     assert.ok(!html.includes('Private trace') && !html.includes('No audit logs found'));
     status = 200; reply = first;
     await model.load();

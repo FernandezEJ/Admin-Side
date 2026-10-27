@@ -11,7 +11,7 @@ export async function checkSidebar(server) {
   const { navigationItems } = await server.ssrLoadModule('/src/components/layout/navigation.js');
   const { hasRole } = await server.ssrLoadModule('/src/auth/roles.js');
   const staff = { name: 'Suffer F.. Cruz', email: 'signed-in@example.test' };
-  const main = ['/dashboard', '/announcements', '/verification', '/donors', '/rewards'];
+  const main = ['/dashboard', '/announcements', '/educational-content', '/verification', '/donors', '/rewards'];
   const system = ['/system-reports', '/admin-management', '/audit-logs'];
 
   for (const role of ['admin', 'super_admin']) {
@@ -31,6 +31,8 @@ export async function checkSidebar(server) {
           assert.equal(nav.includes('>SYSTEM<'), role === 'super_admin', 'No empty or unauthorized System section');
           assert.ok(html.includes('>USER<') && html.includes('Suffer F. Cruz') && html.includes(staff.email));
           assert.ok(html.includes('sidebar-avatar') && html.includes('>SC</span>'));
+          assert.match(html, /<img class="sidebar-logo" src="[^"]*LogoMascot\.png" alt="" width="44" height="44" aria-hidden="true"/u, 'Existing mascot is decorative within the labeled Dashboard link');
+          assert.ok(!html.includes('aria-hidden="true">L</span>'), 'The placeholder brand mark is removed');
           assert.ok(!html.includes('Suffer F.. Cruz'), 'Stored initials are normalized for display only');
           assert.ok(html.includes(collapsed ? 'aria-label="Expand sidebar"' : 'aria-label="Collapse sidebar"'));
           assert.equal(html.includes('is-collapsed'), collapsed);

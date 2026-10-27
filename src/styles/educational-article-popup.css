@@ -1,0 +1,31 @@
+.educational-article-popup > dialog {
+  width: calc(100vw - 32px);
+  max-width: 900px;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: hidden;
+}
+.educational-article-popup > dialog[open] { display: flex; flex-direction: column; }
+.educational-article-popup > dialog > div:first-child {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--color-line);
+}
+.educational-article-popup :is(.education-details-body, .education-editor-content) {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.education-details-body > section { border: 0; border-radius: 0; }
+.educational-article-popup [hidden] { display: none; }
+.educational-article-popup .education-editor-form { border: 0; border-radius: 0; }
+.education-confirmation { padding: 24px; }
+.education-details-body > [role="alert"], .education-details-body > [role="status"] { margin: 20px 24px; }
+@media (min-width: 768px) {
+  .educational-article-popup .education-editor-form > .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (max-width: 639px) {
+  .educational-article-popup > dialog { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); }
+  .educational-article-popup > dialog > div:first-child, .education-confirmation { padding: 16px; }
+}

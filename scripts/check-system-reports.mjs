@@ -172,7 +172,9 @@ export async function checkSystemReports(server) {
       assert.equal(guarded.canPrint(), false);
       assert.equal(session.getSnapshot().isAuthenticated, denied === 403);
       assert.equal(session.getSnapshot().isSuperAdmin, false);
-      assert.ok(render({ ...guarded.getSnapshot(), model: guarded }).includes('Try again'));
+      const deniedHtml = render({ ...guarded.getSnapshot(), model: guarded });
+      assert.ok(!deniedHtml.includes('Try again'), 'Authorization errors must not offer an endless read Retry loop');
+      assert.ok(deniedHtml.includes(denied === 401 ? 'Session expired' : 'Access not permitted'));
       guarded.dispose();
     }
 

@@ -1,0 +1,42 @@
+.permanent-post-editor > dialog {
+  width: calc(100vw - 32px);
+  max-width: 920px;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.permanent-post-editor > dialog[open] { display: flex; flex-direction: column; }
+.permanent-post-editor > dialog > div:first-child {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--color-line);
+}
+.permanent-post-form { display: flex; flex-direction: column; min-height: 0; }
+.permanent-post-form[hidden] { display: none; }
+.permanent-post-editor-body { min-height: 0; padding: 20px 24px; overflow-y: auto; overscroll-behavior: contain; }
+.permanent-post-details { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 24px; }
+.permanent-post-cover { display: grid; place-items: center; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; background: var(--color-primary-soft); }
+.permanent-post-cover img { width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+.permanent-post-cover-control { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--color-line); border-radius: 10px; color: var(--color-primary); font-size: 13px; font-weight: 600; cursor: pointer; }
+.permanent-post-cover-control:hover { background: var(--color-page); border-color: var(--color-primary-border); }
+.permanent-post-cover-control:focus-within { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.permanent-post-cover-control:has(input:disabled) { background: var(--color-neutral-surface); color: var(--color-neutral-foreground); cursor: not-allowed; }
+.permanent-post-editor-footer { display: flex; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--color-line); background: var(--color-surface); }
+.permanent-post-editor.is-confirming-discard > dialog { max-width: 480px; }
+.permanent-post-discard { padding: 24px; overflow-y: auto; }
+
+@media (max-width: 639px) {
+  .permanent-post-details { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .permanent-post-editor > dialog > div:first-child, .permanent-post-editor-body { padding: 16px; }
+  .permanent-post-editor-footer { padding: 12px 16px; }
+  .permanent-post-editor-footer > button { flex: 1; }
+}
+
+/* Short landscape windows keep all controls reachable without a fixed footer. */
+@media (max-height: 480px) {
+  .permanent-post-editor > dialog { overflow-y: auto; }
+  .permanent-post-form, .permanent-post-editor-body { flex-shrink: 0; }
+  .permanent-post-editor-body { overflow: visible; }
+}

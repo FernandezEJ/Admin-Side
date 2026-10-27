@@ -1,5 +1,5 @@
 import { useAnnouncements } from '../services/useAnnouncements';
-import { ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { ErrorState, PageSkeleton, LoadingNotice } from '../components/ui/PageState';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ImagePlus } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -14,7 +14,8 @@ function CreateAnnouncement() {
   const { state } = useLocation();
   const returnToList = () => navigate('/announcements', { state: { announcementFilters: state?.announcementFilters } });
   const { id } = useParams();
-  const { item, loading, busy, error, model } = useAnnouncements(id || 'create');
+  const remote = useAnnouncements(id || 'create');
+  const { item, loading, busy, error, model } = remote;
 
   // ============================================================
   // Announcement Form State
@@ -82,7 +83,7 @@ function CreateAnnouncement() {
               Back to Announcements
             </button>
 
-            {loading ? <PageSkeleton /> : error && id && !item ? <ErrorState description={error} onRetry={model.load} /> : <form
+            <LoadingNotice loading={loading || busy} hasData={!!item} />{loading && !item ? <PageSkeleton variant="form" /> : error && id && !item ? <ErrorState description={error} status={remote.errorStatus} busy={loading} onRetry={model.load} /> : <form
               onSubmit={handlePublish}
               className="rounded-2xl border border-gray-200 bg-white p-7"
             >

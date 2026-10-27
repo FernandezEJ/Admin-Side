@@ -1,7 +1,7 @@
-import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { EmptyState, ErrorState, PageSkeleton, LoadingNotice, SkeletonValue } from '../components/ui/PageState';
 import { isRecoverable } from '../data/recoveryPolicy';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Search, Plus, UserRoundCog, UserCheck, UserX } from 'lucide-react';
+import { Search, Plus, UserRoundCog, UserCheck, UserX, ChevronRight } from 'lucide-react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import AdminDialog from '../components/ui/AdminDialog';
@@ -78,13 +78,13 @@ export function AdminManagementView({ state, model }) {
         <div className="p-4 lg:p-8">
           <div className="mb-6 grid gap-4 md:grid-cols-3">
             {[
-              { status: 'active', label: 'Active Admins', count: summary.active, icon: UserCheck },
-              { status: 'deactivated', label: 'Deactivated Admins', count: summary.deactivated, icon: UserX },
-              { status: 'all', label: 'Total Admins', count: summary.total, icon: UserRoundCog },
-            ].map(({ status, label, count, icon: Icon }) => (
-              <button key={status} type="button" aria-label={`Show ${label}`} aria-pressed={statusTab === status} onClick={() => setStatusTab(status)} className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-primary-border hover:bg-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${statusTab === status ? 'border-primary-border bg-selected' : 'border-gray-200 bg-white'}`}>
-                <Icon size={20} className="mb-3 text-primary" />
-                <p className="text-sm text-gray-500">{label}</p><p className="mt-1 text-2xl font-bold text-gray-900">{loading ? '—' : count}</p>
+              { status: 'active', label: 'Active Admins', count: summary.active, icon: UserCheck, iconClasses: 'bg-success-surface text-success-foreground' },
+              { status: 'deactivated', label: 'Deactivated Admins', count: summary.deactivated, icon: UserX, iconClasses: 'bg-neutral-surface text-neutral-foreground' },
+              { status: 'all', label: 'Total Admins', count: summary.total, icon: UserRoundCog, iconClasses: 'lf-icon-brand' },
+            ].map(({ status, label, count, icon: Icon, iconClasses }) => (
+              <button key={status} type="button" aria-label={`Show ${label}`} aria-pressed={statusTab === status} onClick={() => setStatusTab(status)} className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-primary-border hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${statusTab === status ? 'border-primary bg-selected' : 'border-gray-200 bg-white hover:bg-primary-soft'}`}>
+                <span className="mb-3 flex items-center justify-between gap-3"><span className={`lf-icon-badge ${iconClasses}`}><Icon size={22} aria-hidden="true" /></span><ChevronRight size={18} aria-hidden="true" className="shrink-0 text-primary" /></span>
+                <p className="text-sm text-gray-500">{label}</p><p className="mt-1 text-2xl font-bold text-gray-900">{loading && !state.hasLoaded && !state.admins.length ? <SkeletonValue /> : count}</p>
               </button>
             ))}
           </div>
@@ -92,15 +92,17 @@ export function AdminManagementView({ state, model }) {
             <label className="w-full text-sm font-semibold text-gray-600 sm:max-w-md">
               Search Admins
               <div className="relative mt-2">
-                <Search size={18} className="absolute left-3 top-3.5 text-gray-400" />
+                <Search size={18} aria-hidden="true" className="pointer-events-none absolute left-3 top-3.5 text-primary" />
                 <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name or email" className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 font-normal outline-none focus:border-primary" />
               </div>
             </label>
-            <button id="create-admin" type="button" onClick={() => openEditor()} className={`${primaryButton} flex items-center justify-center gap-2`}><Plus size={18} />Create Admin</button>
+            <button id="create-admin" type="button" onClick={() => openEditor()} className={`${primaryButton} flex items-center justify-center gap-2`}><Plus size={18} aria-hidden="true" />Create Admin</button>
           </div>
           <p className="mb-4 text-sm text-gray-500">Deactivated accounts are recoverable for 30 days. Automatic cleanup runs on the server; accounts with historical records are retained for review.</p>
           <p role="status" className="mb-4 text-sm text-gray-600">{notice}</p>
-          {loading ? <PageSkeleton /> : state.error ? <ErrorState description={state.error} onRetry={model.load} /> : <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+          <LoadingNotice loading={loading} hasData={state.hasLoaded || state.admins.length > 0} />
+          {state.error && <ErrorState description={state.error} compact={state.hasLoaded || state.admins.length > 0} status={state.errorStatus} busy={loading} onRetry={model.load} />}
+          {loading && !state.hasLoaded && !state.admins.length ? <PageSkeleton variant="table" /> : <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-left text-sm">
                 <caption className="sr-only">Admin accounts</caption>
@@ -121,15 +123,15 @@ export function AdminManagementView({ state, model }) {
                           openDetails(admin, event.currentTarget);
                         }
                       }}
-                      className="cursor-pointer border-t border-gray-100 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary">
+                      className="cursor-pointer border-t border-gray-100 transition hover:bg-primary-soft focus-visible:bg-primary-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary">
                       <td className="max-w-48 break-words px-4 py-5 font-semibold text-gray-800">{formatStaffName(admin.name)}</td>
                       <td className="max-w-56 break-words px-4 py-5 text-gray-600">{admin.email}</td>
                       <td className="px-4 py-5 text-gray-500">{formatDate(admin.last_login_at)}</td>
                       <td className="px-4 py-5 text-gray-500">{formatDate(admin.created_at)}</td>
-                      <td className="px-4 py-5"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${admin.status === 'active' ? 'bg-success-surface text-success-foreground' : 'bg-neutral-surface text-neutral-foreground'}`}>{admin.status === 'active' ? 'Active' : 'Deactivated'}</span>{admin.scheduled_for_deletion_at && <p className="mt-2 text-xs text-gray-500">Recovery deadline: {formatDate(admin.scheduled_for_deletion_at)} (30 days)</p>}</td>
+                      <td className="px-4 py-5"><div className="flex items-center justify-between gap-3"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${admin.status === 'active' ? 'bg-success-surface text-success-foreground' : 'bg-neutral-surface text-neutral-foreground'}`}>{admin.status === 'active' ? 'Active' : 'Deactivated'}</span><ChevronRight size={17} aria-hidden="true" className="shrink-0 text-primary" /></div>{admin.scheduled_for_deletion_at && <p className="mt-2 text-xs text-gray-500">Recovery deadline: {formatDate(admin.scheduled_for_deletion_at)} (30 days)</p>}</td>
                     </tr>
                   ))}
-                  {!filteredAdmins.length && <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500"><EmptyState title={statusTab === 'all' ? 'No Admins found' : statusTab === 'active' ? 'No active Admins found' : 'No deactivated Admins found'} description={search ? 'Try another name or email.' : 'Accounts will appear here when available.'} /></td></tr>}
+                  {!loading && !state.error && !filteredAdmins.length && <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500"><EmptyState title={statusTab === 'all' ? 'No Admins found' : statusTab === 'active' ? 'No active Admins found' : 'No deactivated Admins found'} description={search ? 'Try another name or email.' : 'Accounts will appear here when available.'} /></td></tr>}
                 </tbody>
               </table>
             </div>
@@ -137,12 +139,12 @@ export function AdminManagementView({ state, model }) {
         </div>
       </main>
       {modal && <AdminDialog title={modal.discard ? 'Discard changes?' : modal.type === 'details' ? 'Admin Details' : modal.type === 'created' ? 'Admin account created' : modal.type === 'edit' ? (modal.admin ? 'Edit Admin' : 'Create Admin') : modal.type === 'deactivate' ? 'Deactivate Admin' : 'Reactivate Admin'} onClose={closeModal} dismissOnBackdrop closeDisabled={busy}>
-        <div ref={contentRef}>
+        <div ref={contentRef}><LoadingNotice loading={busy} />
         {modal.discard ? <>
           <p className="text-sm leading-6 text-gray-600">Your unsaved changes will be discarded.</p>
           <div className="mt-6 flex flex-wrap justify-end gap-3"><button data-dialog-initial-focus type="button" onClick={model.keepEditing} className={secondaryButton}>Keep Editing</button><button type="button" onClick={model.discardEdit} className={dangerButton}>Discard Changes</button></div>
         </> : modal.type === 'details' ? <>
-          {modal.loading ? <p role="status" className="py-6 text-sm text-gray-500">Loading Admin details...</p> : modal.unavailable || !modal.admin ? <>
+          <LoadingNotice loading={modal.loading} hasData={!!modal.admin} />{modal.unavailable && <ErrorState description={error} compact={state.hasLoaded || state.admins.length > 0} status={state.formErrorStatus} busy={modal.loading} onRetry={() => model.openDetails(modal.admin)} />}{!modal.admin ? <>
             <p role="alert" className="text-sm text-danger-foreground">{error || 'This Admin account is no longer available.'}</p>
             {modal.admin && <button data-dialog-initial-focus type="button" onClick={() => model.openDetails(modal.admin)} className={`${secondaryButton} mt-4`}>Retry Details</button>}
           </> : <>
@@ -155,8 +157,8 @@ export function AdminManagementView({ state, model }) {
               ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-gray-500">{label}</dt><dd className="mt-1 break-words font-semibold text-gray-800">{value}</dd></div>)}
             </dl>
             <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-gray-100 pt-5">
-              <button data-dialog-initial-focus type="button" disabled={busy} onClick={() => openEditor(modal.admin)} className={secondaryButton}>Edit Admin</button>
-              <button type="button" disabled={busy || (modal.admin.status === 'deactivated' && !isRecoverable(modal.admin))} onClick={() => model.openAction(modal.admin.status === 'active' ? 'deactivate' : 'reactivate', modal.admin)} className={modal.admin.status === 'active' ? warningButton : successButton}>{modal.admin.status === 'active' ? 'Deactivate' : 'Reactivate'}</button>
+              <button data-dialog-initial-focus type="button" disabled={busy || modal.loading || modal.unavailable} onClick={() => openEditor(modal.admin)} className={secondaryButton}>Edit Admin</button>
+              <button type="button" disabled={busy || modal.loading || modal.unavailable || (modal.admin.status === 'deactivated' && !isRecoverable(modal.admin))} onClick={() => model.openAction(modal.admin.status === 'active' ? 'deactivate' : 'reactivate', modal.admin)} className={modal.admin.status === 'active' ? warningButton : successButton}>{modal.admin.status === 'active' ? 'Deactivate' : 'Reactivate'}</button>
             </div>
             {modal.admin.status === 'deactivated' && !isRecoverable(modal.admin) && <p className="mt-3 text-sm text-gray-500">The 30-day recovery period has ended. This account awaits cleanup or review.</p>}
           </>}

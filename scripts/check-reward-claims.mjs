@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
@@ -8,6 +10,7 @@ export async function checkRewardClaims(server) {
   const { createRewardClaims, canConfirmClaim } = await server.ssrLoadModule('/src/services/rewardClaims.js');
   const { createRewards } = await server.ssrLoadModule('/src/services/rewardsApi.js');
   const { ClaimVerificationView } = await server.ssrLoadModule('/src/components/rewards/ClaimVerification.jsx');
+  const { claimCodeSuffix } = await server.ssrLoadModule('/src/services/claimCodeInput.js');
   const { RewardsView } = await server.ssrLoadModule('/src/pages/Rewards.jsx');
   const { default: AdminDialog } = await server.ssrLoadModule('/src/components/ui/AdminDialog.jsx');
   const { AdminSessionContext } = await server.ssrLoadModule('/src/auth/useAdminSession.js');
@@ -39,12 +42,22 @@ export async function checkRewardClaims(server) {
   };
   try {
     const model = createRewardClaims(run, () => { updates++; });
+    const field = () => nodes(tree(model)).find(node=>node.props.id==='reward-claim-code');
+    assert.equal(field().props.maxLength,6);assert.equal(field().props.value,'');assert.equal(field().props.pattern,'[A-Z0-9]{6}');assert.ok(button(model,'Verify Code').props.disabled);
+    assert.ok(render(model).includes('id="claim-code-prefix"')&&render(model).includes('>LFW-</span>'));
+    for(const [raw,expected] of [['abc123','ABC123'],['LFW-abc123','ABC123'],[' lfw - 7b-9x 2q ','7B9X2Q'],['1234567','123456'],['!a@b#c$1%2^3','ABC123'],['LFW123','LFW123'],['','']]){
+      assert.equal(claimCodeSuffix(raw),expected);
+      field().props.onChange({target:{value:raw}});assert.equal(field().props.value,expected);assert.equal(model.getSnapshot().code,`LFW-${expected}`);
+      let prevented=false;field().props.onPaste({preventDefault(){prevented=true;},clipboardData:{getData:()=>raw}});assert.equal(prevented,true);assert.equal(field().props.value,expected);
+      assert.equal(button(model,'Verify Code').props.disabled,expected.length!==6);assert.equal(calls.length,0,'Input/paste never dispatch or claim');
+    }
+    model.setCode('');
     assert.ok(render(model).includes('One-Time Claim Code'));
     assert.ok(button(model, 'Verify Code').props.className.includes('bg-primary'));
     assert.equal(await model.verify(), false); assert.equal(calls.length, 0); assert.match(model.getSnapshot().error, /Enter/);
     model.setCode('bad'); assert.equal(await model.verify(), false); assert.equal(calls.length, 0);
     const form = nodes(tree(model)).find((node) => node.type === 'form');
-    model.setCode(' lfw-7b9x2q ');
+    field().props.onPaste({preventDefault(){},clipboardData:{getData:()=> ' lfw-7b9x2q '}});
     assert.equal(calls.length, 0, 'Typing does not submit');
     deferVerify = true;
     form.props.onSubmit({ preventDefault() {} }); const duplicateVerify = model.verify();
@@ -188,6 +201,11 @@ export async function checkRewardClaims(server) {
       if (failure === 401) assert.equal(session.getSnapshot().isAuthenticated, false);
       else assert.equal(session.getSnapshot().mustChangePassword, true);
     }
-    console.log('Reward claim checks passed: staff roles, exact private API contract, normalized form/Enter and duplicate locks, centered accessible dialog, pending/snapshot data, explicit handover and cancellation, server success/reset/refresh, legacy/claimed/partial responses, 401/403/404/409/422/429/network recovery and stale-session disposal.');
+    console.log('Reward claim checks passed: fixed prefix/six-character suffix, uppercase/symbol/length and full-code paste normalization, disabled incomplete input, exact full-code verify/confirm payloads, staff roles, duplicate locks, pending/snapshot data, explicit handover, cancellation/reset/refresh, legacy/claimed/partial responses, error/conflict recovery and stale-session disposal.');
   } finally { globalThis.fetch = originalFetch; }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { createServer } = await import('vite');const server = await createServer({ server: { middlewareMode: true, hmr: false } });
+  try { await checkRewardClaims(server); } finally { await server.close(); }
 }

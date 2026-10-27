@@ -5,7 +5,7 @@ import { ArrowLeft, UserRound, MapPin, CalendarDays, FileText, CheckCircle2, XCi
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import AdminDialog from '../components/ui/AdminDialog';
-import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { EmptyState, ErrorState, PageSkeleton, LoadingNotice } from '../components/ui/PageState';
 import { useVerifications } from '../services/useVerifications';
 import { VERIFICATION_STATUS_LABELS } from '../services/verificationsApi';
 
@@ -27,7 +27,7 @@ export function VerificationDetailView({ remote }) {
   const { item, loading, error, busy, model, proofLoading, proofError, proofUrl, proofType } = remote;
   const [action, setAction] = useState(null);
   const [reason, setReason] = useState('');
-  const canReview = item?.status === 'for_verification';
+  const canReview = !loading && !remote.readFailed && item?.status === 'for_verification';
   const visibleRecord = item && Object.hasOwn(VERIFICATION_STATUS_LABELS, item.status);
   const close = () => { if (!busy) { setAction(null); setReason(''); } };
   const submit = async (event) => {
@@ -39,14 +39,14 @@ export function VerificationDetailView({ remote }) {
     <main className="min-w-0 flex-1">
       <Header title="Verification Review" description="Review the donor's submitted proof before making a decision." />
       <div className="p-4 lg:p-8"><div className="mx-auto max-w-6xl">
-        <button type="button" onClick={() => navigate('/verification')} className="mb-5 flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-primary"><ArrowLeft size={17} />Back to Verification</button>
-        {loading ? <PageSkeleton /> : <>
-          {error && <ErrorState description={error} onRetry={model.load} />}
+        <button type="button" onClick={() => navigate('/verification')} className="mb-5 flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-primary"><ArrowLeft size={17} aria-hidden="true" />Back to Verification</button>
+        <LoadingNotice loading={loading} hasData={!!item} />{loading && !item ? <PageSkeleton variant="detail" /> : <>
+          {error && <ErrorState description={error} compact={!!item} status={remote.errorStatus} busy={loading} onRetry={model.load} />}
           {item && !visibleRecord && <EmptyState title="No verification record to review" description="Return to Verification to review submitted proofs and decision history." />}
           {visibleRecord && <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
             <div className="space-y-6">
               <section className="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 className="mb-5 flex items-center gap-3 font-bold text-gray-800"><UserRound size={20} />Donor Information</h2>
+                <h2 className="mb-5 flex items-center gap-3 font-bold text-gray-800"><UserRound size={20} aria-hidden="true" className="shrink-0 text-primary" />Donor Information</h2>
                 <p className="text-xs uppercase text-gray-400">Donor Name</p><p className="mt-1 break-words font-semibold text-gray-800">{formatDonorName(item.donor.name)}</p>
                 <p className="mt-2 break-words text-sm text-gray-500">{item.donor.email}</p>
                 <div className="mt-5 grid gap-4 sm:grid-cols-2"><div><p className="text-xs uppercase text-gray-400">Blood Type</p><p className="mt-2 font-semibold text-primary">{item.donor.blood_type || 'Unknown'}</p></div>
@@ -55,8 +55,8 @@ export function VerificationDetailView({ remote }) {
               <section className="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 className="font-bold text-gray-800">Donation Information</h2>
                 <p className="mt-5 break-words font-semibold text-gray-800">{item.opportunity.title}</p>
-                <p className="mt-4 flex gap-3 text-sm text-gray-600"><MapPin size={17} />{item.opportunity.location}</p>
-                <p className="mt-4 flex gap-3 text-sm text-gray-600"><CalendarDays size={17} />{item.opportunity.donation_date || 'Confirm arrangements with the chapter.'}</p>
+                <p className="mt-4 flex gap-3 text-sm text-gray-600"><MapPin size={17} aria-hidden="true" className="shrink-0 text-primary" />{item.opportunity.location}</p>
+                <p className="mt-4 flex gap-3 text-sm text-gray-600"><CalendarDays size={17} aria-hidden="true" className="shrink-0 text-primary" />{item.opportunity.donation_date || 'Confirm arrangements with the chapter.'}</p>
                 <p className="mt-4 text-sm text-gray-500">Joined: {date(item.joined_at)}</p>
               </section>
               <section className="rounded-2xl border border-gray-200 bg-white p-6">
@@ -72,7 +72,7 @@ export function VerificationDetailView({ remote }) {
               <p className="mt-2 text-xs text-gray-400">Review the uploaded donation certificate or proof.</p>
               <div className="mt-5 flex min-h-[350px] flex-col items-center justify-center gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">
                 {item.proof ? <>
-                  <FileText size={30} className="text-primary" /><p className="max-w-full break-words font-semibold text-gray-700">{item.proof.name}</p>
+                  <FileText size={28} aria-hidden="true" className="text-primary" /><p className="max-w-full break-words font-semibold text-gray-700">{item.proof.name}</p>
                   <p className="text-xs text-gray-500">{item.proof.mime_type} / {Math.ceil((item.proof.size || 0) / 1024)} KB</p>
                   {proofUrl && proofType.startsWith('image/') && <img src={proofUrl} alt="Submitted donation proof" className="max-h-[600px] max-w-full object-contain" />}
                   {proofUrl && <a href={proofUrl} target="_blank" rel="noopener noreferrer" className={button}>{proofType === 'application/pdf' ? 'Open PDF' : 'Open Image'}</a>}

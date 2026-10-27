@@ -2,6 +2,7 @@ import {
   Users,
   CircleCheck,
   Clock3,
+  ChevronRight,
   ArrowRight,
 } from 'lucide-react';
 
@@ -25,7 +26,7 @@ import SuperAdminOverview from '../components/SuperAdminOverview';
 import { formatDonorName } from '../services/staffNames';
 
 import { Link } from 'react-router-dom';
-import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { EmptyState, ErrorState, PageSkeleton, LoadingNotice } from '../components/ui/PageState';
 import { useDashboard } from '../services/useDashboard';
 import { BLOOD_TYPE_COLORS } from '../data/bloodTypeColors';
 
@@ -34,8 +35,8 @@ export function DashboardView({ remote }) {
   const { data, loading, error, chartLoading, chartError, months, model } = remote;
   const dashboardStats = data ? [
     { title: 'Donors', value: data.stats.donors, description: 'Active registered donors', icon: Users, to: '/donors' },
-    { title: 'Total Eligible', value: data.stats.eligible, description: 'Based on latest saved assessment', icon: CircleCheck },
-    { title: 'Total Not Eligible', value: data.stats.not_eligible, description: 'Based on latest saved assessment', icon: Clock3 },
+    { title: 'Total Eligible', value: data.stats.eligible, description: 'Based on latest saved assessment', icon: CircleCheck, iconClasses: 'bg-success-surface text-success-foreground' },
+    { title: 'Total Not Eligible', value: data.stats.not_eligible, description: 'Based on latest saved assessment', icon: Clock3, iconClasses: 'bg-warning-surface text-warning-foreground' },
   ] : [];
   const donationActivity = data?.donation_activity ?? [];
   const bloodTypeData = data?.blood_types ?? [];
@@ -56,8 +57,8 @@ export function DashboardView({ remote }) {
         <Header />
 
         <div className="space-y-6 p-4 lg:p-8">
-          {loading && !data && <PageSkeleton />}
-          {error && !data && <ErrorState title="Unable to load Dashboard" description={error} onRetry={() => model.load()} />}
+          <LoadingNotice requestKey={months} loading={loading || chartLoading} hasData={!!data} />{loading && !data && <PageSkeleton variant="dashboard" cards={isSuperAdmin ? 6 : 3} />}
+          {error && !data && <ErrorState title="Unable to load Dashboard" description={error} status={remote.errorStatus} busy={loading} onRetry={() => model.load()} />}
           {data && <>
           {/* ==================================================
               Summary Cards
@@ -71,17 +72,17 @@ export function DashboardView({ remote }) {
                 <Card
                   key={stat.title}
                   {...(stat.to ? { to: stat.to } : {})}
-                  className={`rounded-2xl border border-gray-200 bg-white p-6${stat.to ? ' cursor-pointer transition hover:border-primary-border hover:bg-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary' : ''}`}
+                  className={`rounded-2xl border border-gray-200 bg-white p-6${stat.to ? ' cursor-pointer transition hover:border-primary-border hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary' : ''}`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-selected text-primary">
-                      <Icon size={22} strokeWidth={1.8} />
+                    <div className={`lf-icon-badge ${stat.iconClasses ?? 'lf-icon-brand'}`}>
+                      <Icon size={22} strokeWidth={1.8} aria-hidden="true" />
                     </div>
 
                     <span className="text-sm font-semibold text-gray-500">
                       {stat.title}
                     </span>
-                    {stat.to && <ArrowRight size={16} aria-hidden="true" className="ml-auto shrink-0 text-gray-400" />}
+                    {stat.to && <ChevronRight size={18} aria-hidden="true" className="ml-auto shrink-0 text-primary" />}
                   </div>
 
                   <h2 className="mt-6 text-3xl font-bold text-gray-900">
@@ -119,11 +120,11 @@ export function DashboardView({ remote }) {
                 </select>
               </div>
 
-              <div className="relative h-72 w-full" aria-busy={!!chartLoading}>
-                {chartLoading ? <div role="status" aria-label="Loading Donation Activity" className="flex h-full items-center justify-center">
+              {chartError && <ErrorState title="Unable to load Donation Activity" description={chartError} status={remote.chartErrorStatus} busy={chartLoading} onRetry={() => model.load()} />}<div className="relative h-72 w-full" aria-busy={!!chartLoading}>
+                {chartLoading && <div role="status" aria-label="Loading Donation Activity" className="absolute right-0 top-0 z-10 flex items-center justify-center">
                   <span aria-hidden="true" className="h-6 w-6 rounded-full border-2 border-primary-border border-t-primary motion-safe:animate-spin" />
-                </div> : chartError ? <ErrorState title="Unable to load Donation Activity" description={chartError} onRetry={() => model.load()} /> : <>
-                {!donationActivity.some((item) => item.donations > 0) && <p role="status" className="absolute left-0 top-0 text-sm text-gray-500">No completed donations in this period.</p>}
+                </div>}<>
+                {!chartLoading && !chartError && !donationActivity.some((item) => item.donations > 0) && <p role="status" className="absolute left-0 top-0 text-sm text-gray-500">No completed donations in this period.</p>}
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={donationActivity}>
                     <CartesianGrid
@@ -171,7 +172,7 @@ export function DashboardView({ remote }) {
                     />
                   </BarChart>
                 </ResponsiveContainer>
-                </>}
+                </>
               </div>
             </article>
 
@@ -270,7 +271,7 @@ export function DashboardView({ remote }) {
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-primary transition hover:bg-selected"
               >
                 View all
-                <ArrowRight size={16} />
+                <ArrowRight size={16} aria-hidden="true" />
               </Link>
             </div>
 

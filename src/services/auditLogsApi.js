@@ -1,3 +1,4 @@
+import { createReadGate } from './readFeedback';
 import { adminRequest } from './adminAuthApi';
 
 export const auditLogsApi = {
@@ -23,7 +24,8 @@ export function formatAuditDate(value) {
 }
 
 export function createAuditLogs(requestAdmin, api = auditLogsApi) {
-  let state = { data: [], modules: [], search: '', module: '', month: '', page: 1, loading: true, error: '',
+  const readGate = createReadGate();
+  let state = { hasLoaded: false, data: [], modules: [], search: '', module: '', month: '', page: 1, loading: true, errorStatus: undefined, error: '',
     pagination: { currentPage: 1, lastPage: 1, perPage: 20, total: 0 } };
   let version = 0;
   const listeners = new Set();
@@ -32,23 +34,26 @@ export function createAuditLogs(requestAdmin, api = auditLogsApi) {
     getSnapshot: () => state,
     subscribe(notify) { listeners.add(notify); return () => listeners.delete(notify); },
     async load(patch = {}) {
+      const ticket = readGate.start(JSON.stringify({ search: state.search, module: state.module, month: state.month, page: state.page, ...patch }));
+      if (!ticket) return;
       const current = ++version;
       const filters = { search: state.search, module: state.module, month: state.month, page: state.page, ...patch };
-      update({ ...filters, loading: true, error: '' });
+      update({ ...filters, loading: true, errorStatus: undefined, error: '' });
       try {
         const result = await requestAdmin((token) => api.list(token, filters));
         if (current === version) update({ data: result.data, modules: result.modules,
-          pagination: result.pagination, page: result.pagination.currentPage, loading: false });
+          pagination: result.pagination, page: result.pagination.currentPage, loading: false, hasLoaded: true });
       } catch (error) {
-        if (current === version) update({ loading: false, error: error.message });
+        if (current === version) update({ loading: false, errorStatus: error.status, error: error.message });
       }
+      finally { readGate.finish(ticket); }
     },
     setFilters: (filters) => model.load({ ...filters, page: 1 }),
     setPage(page) {
       if (state.loading || page < 1 || page > state.pagination.lastPage) return;
       return model.load({ page });
     },
-    dispose() { version++; },
+    dispose() { readGate.clear(); version++; },
   };
   return model;
 }

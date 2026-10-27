@@ -1,3 +1,4 @@
+import { createReadGate } from './readFeedback';
 import { adminRequest, AuthApiError } from './adminAuthApi';
 
 const calendarDate = (value) => value ? new Date(value).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) : '';
@@ -33,7 +34,8 @@ export const announcementsApi = {
 };
 
 export function createAnnouncements(requestAdmin, id, api = announcementsApi) {
-  let state = { items: [], item: null, loading: id !== 'create', busy: false, error: '',
+  const readGate = createReadGate();
+  let state = { hasLoaded: false, items: [], item: null, loading: id !== 'create', busy: false, errorStatus: undefined, error: '',
     participants: [], participantsMeta: null, participantsPage: 1, participantsLoading: false, participantsError: '' };
   let version = 0, participantsVersion = 0;
   const listeners = new Set();
@@ -43,17 +45,20 @@ export function createAnnouncements(requestAdmin, id, api = announcementsApi) {
     subscribe: (notify) => { listeners.add(notify); return () => listeners.delete(notify); },
     async load() {
       if (id === 'create') return;
+      const ticket = readGate.start('');
+      if (!ticket) return;
       const current = ++version;
-      update({ loading: true, error: '' });
+      update({ loading: true, errorStatus: undefined, error: '' });
       try {
         const result = await requestAdmin((token) => id ? api.detail(token, id) : api.list(token));
-        if (current === version) update({ ...(id ? { item: result } : { items: result }), loading: false });
-      } catch (error) { if (current === version) update({ error: error.message, loading: false }); }
+        if (current === version) update({ ...(id ? { item: result } : { items: result }), loading: false, hasLoaded: true });
+      } catch (error) { if (current === version) update({ errorStatus: error.status, error: error.message, loading: false }); }
+      finally { readGate.finish(ticket); }
     },
     async save(draft, image, status) {
       if (state.busy) return false;
       const current = version;
-      update({ busy: true, error: '' });
+      update({ busy: true, errorStatus: undefined, error: '' });
       try {
         const item = await requestAdmin((token) => api.save(token, id === 'create' ? null : id, draft, image, status));
         if (current !== version) return false;
@@ -74,7 +79,7 @@ export function createAnnouncements(requestAdmin, id, api = announcementsApi) {
         update({ participants: result.data, participantsMeta: result.meta });
         return true;
       } catch (error) {
-        if (current === version && operation === participantsVersion) update({ participantsError: error.message });
+        if (current === version && operation === participantsVersion) update({ participantsErrorStatus: error.status, participantsError: error.message });
         return false;
       } finally {
         if (current === version && operation === participantsVersion) update({ participantsLoading: false });
@@ -83,19 +88,19 @@ export function createAnnouncements(requestAdmin, id, api = announcementsApi) {
     async action(target, action) {
       if (state.busy) return false;
       const current = version;
-      update({ busy: true, error: '' });
+      update({ busy: true, errorStatus: undefined, error: '' });
       try {
         const item = await requestAdmin((token) => api.action(token, target, action));
         if (current !== version) return false;
         update({ ...(id ? { item } : {}), items: state.items.map((row) => row.id === item.id ? item : row) });
         return true;
       } catch (error) {
-        if (current === version) update({ error: error.message });
+        if (current === version) update({ errorStatus: error.status, error: error.message });
         return false;
       }
       finally { if (current === version) update({ busy: false }); }
     },
-    dispose() { version++; participantsVersion++; },
+    dispose() { readGate.clear(); version++; participantsVersion++; },
   };
   return model;
 }

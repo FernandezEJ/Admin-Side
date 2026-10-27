@@ -4,6 +4,7 @@ import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 
 export async function checkAnnouncements(server) {
+  await checkPermanentPost(server);
   const { createAnnouncements, filterAnnouncements } = await server.ssrLoadModule('/src/services/announcementsApi.js');
   const { AnnouncementsView } = await server.ssrLoadModule('/src/pages/Announcements.jsx');
   const { AnnouncementPopup, AnnouncementPopupView, JoinedParticipants, AnnouncementParticipants } = await server.ssrLoadModule('/src/pages/ViewAnnouncement.jsx');
@@ -113,7 +114,7 @@ export async function checkAnnouncements(server) {
         // The event's currentTarget is a focusable DOM row in the browser.
         function ExerciseRows() {
           const view = AnnouncementsView({ remote }), nodes = descendants(view);
-          const row = nodes.find((node) => node.type === 'tbody').props.children[0];
+          const row = descendants(nodes.find((node) => node.type === 'tbody')).find(node => node.type === 'tr' && node.props['aria-label']);
           const popup = nodes.find((node) => node.type === AnnouncementPopup);
           assert.ok(row.props['aria-label'].includes('Matching drive'));
           if (step < actions.length) actions[step++](row, popup);
@@ -170,7 +171,9 @@ export async function checkAnnouncements(server) {
     assert.ok(!deletedHtml.includes('Edit Announcement') && !deletedHtml.includes('>Delete</button>') && deletedHtml.includes('Restore Announcement'));
     assert.ok(popupHtml(popupRemote('deleted', { item: { ...sample, status: 'deleted', scheduled_for_deletion_at: '2000-01-01' } })).includes('disabled=""'));
     assert.ok(popupHtml(popupRemote('active', { error: 'Unable to delete.' })).includes('role="alert"'));
-    assert.ok(popupHtml(popupRemote('active', { loading: true })).includes('Loading page'));
+    const refreshingPopup = popupHtml(popupRemote('active', { loading: true }));
+    assert.ok(!refreshingPopup.includes('Loading page') && refreshingPopup.includes('Popup drive'), 'Cached announcement details stay mounted during refresh');
+    assert.ok(popupHtml(popupRemote('active', { loading: true, item: null })).includes('Loading page'));
     assert.ok(popupHtml(popupRemote('active', { busy: true })).includes('Deleting...'));
     const summary = renderToString(React.createElement(JoinedParticipants, { announcement: { participants_count: 1, participants_preview: [{ id: 1, name: 'Saved donor name' }] }, onView: () => {} }));
     assert.ok(summary.includes('1 joined') && summary.includes('Saved donor name') && summary.includes('View Participants'));
@@ -200,7 +203,7 @@ export async function checkAnnouncements(server) {
     assert.equal(list.getSnapshot().loading, true);
     assert.ok(render({ ...list.getSnapshot(), model: list }).includes('Loading page'));
     await list.load(); assert.deepEqual(list.getSnapshot().items, []);
-    assert.ok(render({ ...list.getSnapshot(), model: list }).includes('No announcements found'));
+    assert.ok(render({ ...list.getSnapshot(), model: list }).includes('No announcements in this status'));
     const draft = { title: 'Real API drive', description: documentText(rich), description_document: rich, location: 'Dagupan',
       donationDate: '2026-10-01', expiresDate: '2026-10-01', notifyDonors: true };
     const form = createAnnouncements(run, 'create');
@@ -275,4 +278,107 @@ export async function checkAnnouncements(server) {
     assert.equal(pending.getSnapshot().loading, true, 'Unmounted response ignored');
     console.log('Announcement checks passed: five columns without table actions; row click/Enter/Space and nested/repeat guards for both roles/all statuses; centered popup details/rich text and legal Edit/Delete/Restore states; preserved cards/dropdowns/return filters; real transport, lifecycle, loading/errors, duplicate and stale mutations.');
   } finally { globalThis.fetch = originalFetch; }
+}
+
+export async function checkPermanentPost(server) {
+  const { createPermanentPost, permanentPostApi } = await server.ssrLoadModule('/src/services/permanentPostApi.js');
+  const { PermanentPostPanelView, PermanentPostEditor } = await server.ssrLoadModule('/src/components/announcements/PermanentPostPanel.jsx');
+  const { default: AdminDialog } = await server.ssrLoadModule('/src/components/ui/AdminDialog.jsx');
+  const { default: AnnouncementEditor } = await server.ssrLoadModule('/src/components/announcements/AnnouncementEditor.jsx');
+  const original = { id: 1, title: 'Saved chapter <script>title</script>', summary: 'Saved short preview', description: 'Saved full content', image_url: 'https://media.test/cover.png' };
+  const defer = () => { let resolve, reject;const promise = new Promise((a, b) => { resolve = a;reject = b; });return { promise, resolve, reject }; };
+  let pending = defer(), reads = 0, writes = 0;
+  const api = { read: async () => { reads++;return pending.promise; }, save: async () => { writes++;return pending.promise; } };
+  const model = createPermanentPost(operation => operation('staff-test'), api);
+  let request = model.load();model.load();assert.equal(reads, 1);pending.reject(new Error('Offline'));await request;
+  assert.equal(model.getSnapshot().loading, false);assert.equal(model.getSnapshot().item, null);assert.equal(model.getSnapshot().error, 'Offline');
+  pending = defer();request = model.load();pending.resolve(original);await request;
+  assert.equal(model.getSnapshot().item, original);
+  pending = defer();request = model.save(original);assert.equal(await model.save(original), false);assert.equal(writes, 1);
+  pending.reject(Object.assign(new Error('Validation failed'), { errors: { summary: ['Enter a short description.'] } }));assert.equal(await request, false);
+  assert.equal(model.getSnapshot().error, 'Enter a short description.');assert.equal(model.getSnapshot().item, original);assert.equal(model.getSnapshot().busy, false);
+  pending = defer();request = model.save(original);pending.resolve({ ...original, title: 'Edited chapter' });assert.equal(await request, true);assert.equal(model.getSnapshot().saved, true);
+  assert.equal(model.getSnapshot().item.title, 'Edited chapter');
+  pending = defer();request = model.load();model.dispose();pending.resolve(original);await request;assert.equal(model.getSnapshot().item.title, 'Edited chapter', 'Departed responses are ignored');
+  pending = defer();request = model.load();pending.resolve(original);await request;assert.equal(model.getSnapshot().loading, false, 'Strict-mode cleanup permits a fresh request');
+  const document = { version: 1, blocks: [{ type: 'paragraph', content: [{ text: 'Full details', bold: true }] }] };
+  const previousFetch = globalThis.fetch, transport = [];
+  globalThis.fetch = async (url, options) => { transport.push({ url, options });return Response.json({ post: original }); };
+  try {
+    await permanentPostApi.read('staff-test');await permanentPostApi.save('staff-test', { ...original, description_document: document });
+    assert.ok(transport.every(call => call.url.endsWith('/admin/permanent-post')));
+    const body = transport[1].options.body;assert.equal(body.get('_method'), 'PUT');assert.equal(body.get('summary'), original.summary);assert.deepEqual(JSON.parse(body.get('description_document')), document);
+    for (const key of ['expires_at', 'donation_date', 'status', 'notify_donors', 'image_path']) assert.equal(body.has(key), false);
+  } finally { globalThis.fetch = previousFetch; }
+  const html = renderToString(React.createElement(PermanentPostPanelView, { remote: { item: original }, onEdit() {} }));
+  assert.ok(html.includes('Permanent Post / No expiration') && html.includes('Edit Permanent Post') && html.includes(original.summary));
+  assert.ok(html.includes('&lt;script&gt;title&lt;/script&gt;') && !html.includes('<script>title</script>'));
+  const errorHtml = renderToString(React.createElement(PermanentPostPanelView, { remote: { error: 'Offline', model }, onEdit() {} }));assert.ok(errorHtml.includes('Try again') && !errorHtml.includes('Edit Permanent Post'));
+  const loadingHtml = renderToString(React.createElement(PermanentPostPanelView, { remote: { loading: true } }));assert.ok(loadingHtml.includes('Loading page') && !loadingHtml.includes('Edit Permanent Post'));
+  const descendants = element => !React.isValidElement(element) ? [] : [element, ...React.Children.toArray(element.props.children).flatMap(descendants)];
+  let step = 0, closed = 0;
+  function ExerciseEditor() {
+    const tree = PermanentPostEditor({ item: original, remote: { busy: false }, model, onClose: () => { closed++; } });
+    const nodes = descendants(tree);
+    const dialog = nodes.find(node => node.type === AdminDialog);
+    if (step === 0) { step++;nodes.find(node => node.type === 'input' && node.props.maxLength === 255).props.onChange({ target: { value: 'Unsaved title' } }); }
+    else if (step === 1) { step++;dialog.props.onClose(); }
+    else if (step === 2) { step++;assert.equal(dialog.props.title, 'Discard unsaved changes?');assert.equal(nodes.find(node => node.type === 'form').props.hidden, true, 'Confirming discard hides rather than unmounts the rich editor');nodes.find(node => node.type === 'button' && node.props.children === 'Keep Editing').props.onClick(); }
+    else if (step === 3) { step++;assert.ok(nodes.some(node => node.type === 'input' && node.props.value === 'Unsaved title'));dialog.props.onClose(); }
+    else { nodes.find(node => node.type === 'button' && node.props.children === 'Discard Changes').props.onClick(); }
+    return tree;
+  }
+  renderToString(React.createElement(ExerciseEditor));assert.equal(closed, 1);
+  const editorHtml = renderToString(React.createElement(PermanentPostEditor, { item: original, remote: { busy: true }, model, onClose() {} }));
+  assert.ok(editorHtml.includes('Saving…') && editorHtml.includes('image/jpeg,image/png') && editorHtml.includes('Short description'));
+  assert.ok(!editorHtml.includes('type="date"') && !editorHtml.includes('Publish'));
+  for (const cover of [null, original.image_url]) {
+    const html = renderToString(React.createElement(PermanentPostEditor, { item: { ...original, image_url: cover, description_document: document }, remote: { busy: false }, model, onClose() {} }));
+    assert.ok(html.includes('Philippine Red Cross · No expiration') && html.includes('>Permanent</span>'));
+    assert.ok(html.includes(cover ? 'Permanent post cover preview' : 'No cover image'));
+    assert.ok(html.includes(cover ? 'Replace Cover' : 'Choose Cover'));
+    assert.ok(html.includes('Maximum 500 characters') && html.includes('up to 5 MB'));
+    assert.ok(html.includes('value="Saved chapter &lt;script&gt;title&lt;/script&gt;"') && html.includes(original.summary));
+    assert.ok(html.includes('permanent-post-editor-footer') && html.includes('aria-labelledby='));
+  }
+  const validCover = new File(['new-cover'], 'replacement.png', { type: 'image/png' });
+  const oldCreateURL = URL.createObjectURL;
+  const previews = [];
+  URL.createObjectURL = file => { previews.push(file);return `blob:preview-${previews.length}`; };
+  try {
+    let stage = 0;
+    function ExerciseCover() {
+      // A changed prop represents an unrelated background refresh, not a new editor session.
+      const tree = PermanentPostEditor({ item: stage ? { ...original, title: 'Refreshed title', image_url: 'https://media.test/refreshed.png' } : original,
+        remote: { busy: false, error: stage >= 2 ? 'Upload failed. Try again.' : '' }, model: { save() { assert.fail('Preview must not upload'); } }, onClose() { assert.fail('Discard was not confirmed'); } });
+      const nodes = descendants(tree), file = nodes.find(node => node.props.type === 'file');
+      const cover = nodes.find(node => node.type === 'img');
+      if (stage === 0) {
+        assert.equal(cover.props.src, original.image_url);stage++;
+        file.props.onChange({ target: { files: [validCover] } });
+      } else if (stage === 1) {
+        assert.equal(cover.props.src, 'blob:preview-1');stage++;
+        nodes.find(node => node.props.name === 'title').props.onChange({ target: { value: 'My unsaved title' } });
+      } else if (stage === 2) {
+        assert.equal(cover.props.src, 'blob:preview-1');
+        assert.equal(nodes.find(node => node.props.name === 'title').props.value, 'My unsaved title');stage++;
+        file.props.onChange({ target: { files: [new File(['bad'], 'bad.gif', { type: 'image/gif' })] } });
+      } else if (stage === 3) {
+        assert.equal(cover.props.src, 'blob:preview-1');assert.equal(file.props['aria-invalid'], true);stage++;
+        nodes.find(node => node.type === 'button' && node.props.children === 'Use saved cover').props.onClick();
+      } else {
+        assert.equal(cover.props.src, original.image_url, 'Clearing the replacement returns to the saved baseline');
+        assert.equal(file.props['aria-invalid'], false);
+        assert.equal(nodes.find(node => node.props.name === 'title').props.value, 'My unsaved title');
+        assert.equal(nodes.find(node => node.type === AnnouncementEditor).props.value.blocks[0].content[0].text, original.description);
+      }
+      return tree;
+    }
+    const failedHtml = renderToString(React.createElement(ExerciseCover));
+    assert.ok(failedHtml.includes('role="alert"') && failedHtml.includes('Upload failed. Try again.'));
+    assert.equal(previews.length, 1, 'Rejected files never replace or preview the saved cover');
+    assert.equal(original.image_url, 'https://media.test/cover.png');
+  } finally { URL.createObjectURL = oldCreateURL; }
+  model.dispose();
+  console.log('Permanent post checks passed: real read/multipart update, independent loading/retry, duplicate/stale guards, prefilled modal/empty and saved covers, local replacement/type validation/reset without uploads, retained draft/cover on refresh and errors, rich editor retained through discard confirmation, busy controls and unchanged schema.');
 }

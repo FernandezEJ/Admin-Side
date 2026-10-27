@@ -1,9 +1,10 @@
 import { filterAnnouncements } from '../services/announcementsApi';
 import { useAnnouncements } from '../services/useAnnouncements';
-import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { EmptyState, ErrorState, PageSkeleton, LoadingNotice, SkeletonValue } from '../components/ui/PageState';
 import { useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AnnouncementPopup } from './ViewAnnouncement';
+import PermanentPostPanel from '../components/announcements/PermanentPostPanel';
 
 import {
   Plus,
@@ -14,7 +15,7 @@ import {
   Trash2,
   MapPin,
   FileText,
-  ArrowRight,
+  ChevronRight,
 } from 'lucide-react';
 
 import Sidebar from '../components/layout/Sidebar';
@@ -126,7 +127,7 @@ export function AnnouncementsView({ remote }) {
               onClick={() => formNavigation('/announcements/create')}
               className="flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary-hover"
             >
-              <Plus size={18} />
+              <Plus size={18} aria-hidden="true" />
               Create Announcement
             </button>
           </section>
@@ -138,21 +139,25 @@ export function AnnouncementsView({ remote }) {
                 label: 'Active',
                 status: 'active',
                 icon: Megaphone,
+                iconClasses: 'bg-success-surface text-success-foreground',
               },
               {
                 label: 'Drafts',
                 status: 'draft',
                 icon: FileText,
+                iconClasses: 'bg-neutral-surface text-neutral-foreground',
               },
               {
                 label: 'Expired',
                 status: 'expired',
                 icon: CalendarClock,
+                iconClasses: 'bg-warning-surface text-warning-foreground',
               },
               {
                 label: 'Deleted',
                 status: 'deleted',
                 icon: Trash2,
+                iconClasses: 'bg-danger-surface text-danger-foreground',
               },
             ].map((item) => {
               const Icon = item.icon;
@@ -164,28 +169,28 @@ export function AnnouncementsView({ remote }) {
                   onClick={() => setActiveTab(item.status)}
                   aria-label={`Show ${item.label} announcements`}
                   aria-pressed={activeTab === item.status}
-                  className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-primary-border hover:bg-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                  className={`group min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-primary-border hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                     activeTab === item.status
-                      ? 'border-primary-border bg-selected'
-                      : 'border-gray-200 bg-white'
+                      ? 'border-primary bg-selected'
+                      : 'border-gray-200 bg-white hover:bg-primary-soft'
                   }`}
                 >
                   <span className="flex items-center justify-between gap-3">
                     <span className="min-w-0">
-                      <span className="block text-sm font-medium text-gray-500">
+                      <span className="block break-words text-sm font-medium text-gray-500">
                         {item.label}
                       </span>
 
-                      <span className="mt-2 block text-2xl font-bold text-gray-900">
-                        {loading ? '-'  : getCount(item.status)}
+                      <span className="mt-2 block break-words text-2xl font-bold text-gray-900">
+                        {loading && !remote.hasLoaded && !announcements.length ? <SkeletonValue /> : getCount(item.status)}
                       </span>
                     </span>
 
                     <span className="flex shrink-0 items-center gap-2">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-selected text-primary">
-                        <Icon size={21} aria-hidden="true" />
+                      <span className={`lf-icon-badge ${item.iconClasses}`}>
+                        <Icon size={22} aria-hidden="true" />
                       </span>
-                      <ArrowRight size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
+                      <ChevronRight size={18} aria-hidden="true" className="shrink-0 text-primary" />
                     </span>
                   </span>
                 </button>
@@ -193,14 +198,15 @@ export function AnnouncementsView({ remote }) {
             })}
           </section>
 
+          <PermanentPostPanel />
+
           {/* Announcement list */}
           <section className="rounded-2xl border border-gray-200 bg-white">
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">
               <div className="relative min-w-0 w-full flex-1 sm:min-w-40">
-                <Search
-                  size={17}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                <Search size={18} aria-hidden="true"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none"
                 />
 
                 <input
@@ -246,8 +252,8 @@ export function AnnouncementsView({ remote }) {
               </button>
             </div>
 
-            {loading && <PageSkeleton />}
-            {error && <ErrorState description={error} onRetry={model.load} />}
+            <LoadingNotice loading={loading} hasData={remote.hasLoaded || remote.items.length > 0} />
+            {error && <ErrorState description={error} compact={remote.hasLoaded || announcements.length > 0} status={remote.errorStatus} busy={loading} onRetry={model.load} />}
             {/* Table */}
             <div ref={tableRef} tabIndex={-1} aria-label="Announcements table" className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-primary">
               <table className="w-full min-w-[720px] text-left">
@@ -276,8 +282,8 @@ export function AnnouncementsView({ remote }) {
                   </tr>
                 </thead>
 
-                <tbody>
-                  {!loading && filteredAnnouncements.map((announcement) => (
+                <tbody>{loading && !remote.hasLoaded && !remote.items.length && <tr><td colSpan={5}><PageSkeleton variant="table" header={false} /></td></tr>}
+                  {filteredAnnouncements.map((announcement) => (
                     <tr
                       key={announcement.id}
                       tabIndex={0}
@@ -294,7 +300,7 @@ export function AnnouncementsView({ remote }) {
                           openAnnouncement(announcement.id, event.currentTarget);
                         }
                       }}
-                      className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary last:border-0"
+                      className="cursor-pointer border-b border-gray-100 transition hover:bg-primary-soft focus-visible:bg-primary-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary last:border-0"
                     >
                       <td className="px-6 py-5">
                         <div className="font-semibold text-gray-800">
@@ -321,6 +327,7 @@ export function AnnouncementsView({ remote }) {
                       </td>
 
                       <td className="px-4 py-5">
+                        <div className="flex items-center justify-between gap-4">
                         <span
                           className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${
                             announcement.status === 'active'
@@ -340,6 +347,8 @@ export function AnnouncementsView({ remote }) {
                             ? 'Expired'
                             : 'Deleted'}
                         </span>
+                        <ChevronRight size={17} aria-hidden="true" className="shrink-0 text-primary" />
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -347,7 +356,7 @@ export function AnnouncementsView({ remote }) {
               </table>
 
               {!loading && !error && filteredAnnouncements.length === 0 && (
-                <EmptyState title="No announcements found" />
+                <EmptyState title={searchTerm.trim() || selectedMonth !== 'all' || selectedYear !== 'all' ? "No announcements match your filters" : "No announcements in this status"} description="Try another status or adjust your filters." />
               )}
             </div>
           </section>

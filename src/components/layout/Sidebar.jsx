@@ -6,6 +6,7 @@ import { useAdminSession } from '../../auth/useAdminSession';
 import { hasRole, ADMIN_ROLES } from '../../auth/roles';
 import { formatStaffName } from '../../services/staffNames';
 import { useSidebar } from './useSidebar';
+import logoMascot from '../../assets/LogoMascot.png';
 import '../../styles/sidebar.css';
 
 const focusableSelector = 'a[href], button:not(:disabled), [tabindex="0"]';
@@ -82,7 +83,7 @@ function Sidebar() {
         role={mobileOpen ? 'dialog' : undefined} aria-modal={mobileOpen ? true : undefined} className="lifeflow-sidebar">
         <div className="sidebar-heading">
           <NavLink to="/dashboard" title="LifeFlow Dashboard" aria-label="LifeFlow Dashboard" className="sidebar-brand" onClick={closeMobile}>
-            <span className="sidebar-logo" aria-hidden="true">L</span>
+            <img className="sidebar-logo" src={logoMascot} alt="" width="44" height="44" aria-hidden="true" />
             <span className="sidebar-label"><span className="sidebar-wordmark">LifeFlow</span><span className="sidebar-subtitle">Admin</span></span>
           </NavLink>
           <button type="button" className="sidebar-toggle" onClick={toggleCollapsed} aria-controls="admin-sidebar"

@@ -1,5 +1,5 @@
 import { formatDonorName } from '../services/staffNames';
-import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { EmptyState, ErrorState, PageSkeleton, LoadingNotice, SkeletonValue } from '../components/ui/PageState';
 import { useMemo, useRef, useState } from 'react';
 
 import {
@@ -7,9 +7,8 @@ import {
   Clock3,
   CircleCheck,
   CircleX,
-  Eye,
   RotateCcw,
-  ArrowRight,
+  ChevronRight,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
@@ -37,10 +36,14 @@ export function VerificationView({ remote }) {
   const { items: verificationRequests, loading, error, model } = remote;
   const [selectedId, setSelectedId] = useState(null);
   const tableFocusRef = useRef(null);
+  const reviewOpenRef = useRef(false);
   const openReview = (id, target) => {
+    if (reviewOpenRef.current) return;
+    reviewOpenRef.current = true;
     target.focus({ preventScroll: true });
     setSelectedId(id);
   };
+  const closeReview = () => { reviewOpenRef.current = false;setSelectedId(null); };
 
   // ============================================================
   // Filters
@@ -173,20 +176,20 @@ export function VerificationView({ remote }) {
                 onClick={() => setActiveTab(status)}
                 aria-label={`Show ${label} records`}
                 aria-pressed={activeTab === status}
-                className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-primary-border hover:bg-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-                  activeTab === status ? 'border-primary-border bg-selected' : 'border-gray-200 bg-white'
+                className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-primary-border hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                  activeTab === status ? 'border-primary bg-selected' : 'border-gray-200 bg-white hover:bg-primary-soft'
                 }`}
               >
                 <span className="flex items-center justify-between gap-3">
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium text-gray-500">{label}</span>
-                    <span className="mt-2 block text-2xl font-bold text-gray-900">{getCount(status)}</span>
+                    <span className="block break-words text-sm font-medium text-gray-500">{label}</span>
+                    <span className="mt-2 block break-words text-2xl font-bold text-gray-900">{loading && !remote.hasLoaded && !verificationRequests.length ? <SkeletonValue /> : getCount(status)}</span>
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
-                    <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${className}`}>
-                      <Icon size={21} aria-hidden="true" />
+                    <span className={`lf-icon-badge ${className}`}>
+                      <Icon size={22} aria-hidden="true" />
                     </span>
-                    <ArrowRight size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
+                    <ChevronRight size={18} aria-hidden="true" className="shrink-0 text-primary" />
                   </span>
                 </span>
               </button>;
@@ -197,34 +200,13 @@ export function VerificationView({ remote }) {
               Verification Records
               ================================================== */}
           <section className="rounded-2xl border border-gray-200 bg-white">
-            {/* Status Tabs */}
-            <div className="border-b border-gray-200 px-6 pt-5">
-              <div className="flex flex-wrap gap-6">
-                {Object.entries(VERIFICATION_STATUS_LABELS).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setActiveTab(id)}
-                    className={`border-b-2 pb-4 text-sm font-semibold transition ${
-                      activeTab === id
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-gray-400 hover:text-gray-700'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* ==================================================
                 Search + Filters
                 ================================================== */}
             <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">
               <div className="relative min-w-0 w-full sm:min-w-64 flex-1">
-                <Search
-                  size={17}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                <Search size={18} aria-hidden="true"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none"
                 />
 
                 <input
@@ -281,8 +263,8 @@ export function VerificationView({ remote }) {
             {/* ==================================================
                 Verification Table
                 ================================================== */}
-            {loading && <PageSkeleton />}
-            {error && <ErrorState description={error} onRetry={model.load} />}
+            <LoadingNotice loading={loading} hasData={remote.hasLoaded || remote.items.length > 0} />
+            {error && <ErrorState description={error} compact={remote.hasLoaded || verificationRequests.length > 0} status={remote.errorStatus} busy={loading} onRetry={model.load} />}
             <div ref={tableFocusRef} tabIndex={-1} aria-label="Verification records" className="w-full overflow-x-auto">
               <table className="w-full min-w-[640px] table-fixed text-left">
                 <thead>
@@ -291,7 +273,7 @@ export function VerificationView({ remote }) {
                       Donor
                     </th>
 
-                    <th className="w-[10%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <th className="w-[12%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
                       Blood Type
                     </th>
 
@@ -303,29 +285,28 @@ export function VerificationView({ remote }) {
                       Submitted
                     </th>
 
-                    <th className="w-[14%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <th className="w-[26%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
                       Status
                     </th>
-                    <th className="w-[14%] px-2 py-4 text-right text-xs font-semibold uppercase tracking-wide text-gray-400">Actions</th>
                   </tr>
                 </thead>
 
-                <tbody>
-                  {!loading && !error && filteredRequests.map((request) => (
+                <tbody>{loading && !remote.hasLoaded && !remote.items.length && <tr><td colSpan={5}><PageSkeleton variant="table" header={false} /></td></tr>}
+                  {filteredRequests.map((request) => (
                     <tr
                       key={request.id}
                       tabIndex={0}
                       aria-label={`Review verification for ${formatDonorName(request.donor)}, ${VERIFICATION_STATUS_LABELS[request.status]}`}
                       aria-haspopup="dialog"
                       onClick={(event) => {
-                        if (event.target.closest('button, a, input, select, textarea')) return;
+                        if (event.target.closest('button, a, input, select, textarea, [contenteditable="true"]')) return;
                         openReview(request.id, event.currentTarget);
                       }}
                       onKeyDown={(event) => {
-                        if (event.target !== event.currentTarget) return;
+                        if (event.target !== event.currentTarget || event.repeat) return;
                         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openReview(request.id, event.currentTarget); }
                       }}
-                      className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary last:border-0"
+                      className="cursor-pointer border-b border-gray-100 transition hover:bg-primary-soft focus-visible:bg-primary-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary last:border-0"
                     >
                       <td className="break-words px-4 py-5">
                         <p className="font-semibold text-gray-800">
@@ -333,7 +314,7 @@ export function VerificationView({ remote }) {
                         </p>
                       </td>
 
-                      <td className="px-4 py-5">
+                      <td className="px-3 py-5">
                         <span className="inline-flex min-w-10 justify-center rounded-lg px-2.5 py-1.5 text-xs font-bold text-primary">
                           {request.bloodType}
                         </span>
@@ -347,15 +328,11 @@ export function VerificationView({ remote }) {
                         {formatDate(request.submittedDate)}
                       </td>
 
-                      <td className="px-4 py-5">
-                        {renderStatus(request.status)}
-                      </td>
-                      <td className="px-2 py-5 text-right">
-                        <button type="button" aria-label={`View verification for ${formatDonorName(request.donor)}`} aria-haspopup="dialog"
-                          onClick={(event) => { event.stopPropagation(); openReview(request.id, event.currentTarget); }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2 py-2 text-xs font-semibold text-gray-600 transition hover:border-primary-border hover:bg-selected hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-                          <Eye size={14} aria-hidden="true" />View
-                        </button>
+                      <td className="px-3 py-5">
+                        <div className="flex min-w-0 items-center justify-between gap-2">
+                          {renderStatus(request.status)}
+                          <ChevronRight size={17} aria-hidden="true" className="shrink-0 text-primary" />
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -364,14 +341,14 @@ export function VerificationView({ remote }) {
 
               {/* Empty State */}
               {!loading && !error && filteredRequests.length === 0 && (
-                <EmptyState title="No verification records found" />
+                <EmptyState title={searchTerm.trim() || selectedMonth !== 'all' || selectedYear !== 'all' ? "No matching requests found" : "No requests in this status"} description="Submitted donation proofs will appear in the appropriate status." />
               )}
             </div>
           </section>
         </div>
       </main>
       {selectedId !== null && <VerificationReviewDrawer key={selectedId} id={selectedId} fallbackFocusRef={tableFocusRef}
-        onClose={() => setSelectedId(null)} onDecision={() => { setSelectedId(null); void model.load(); }} />}
+        onClose={closeReview} onDecision={() => { closeReview(); void model.load(); }} />}
     </div>
   );
 }

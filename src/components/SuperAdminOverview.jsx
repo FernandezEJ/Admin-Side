@@ -1,13 +1,13 @@
 import { EmptyState } from './ui/PageState';
 import { Link } from 'react-router-dom';
-import { UserRoundCog, UserCheck, Gift, ArrowRight } from 'lucide-react';
+import { UserRoundCog, UserCheck, Gift, ArrowRight, ChevronRight } from 'lucide-react';
 import { formatDate } from '../data/adminManagement';
 import { formatStaffName } from '../services/staffNames';
 
 export default function SuperAdminOverview({ overview }) {
   const cards = [
     { label: 'Total Admins', value: overview.total_admins, description: 'Admin accounts', icon: UserRoundCog, to: '/admin-management' },
-    { label: 'Active Admins', value: overview.active_admins, description: 'Active admin accounts', icon: UserCheck, to: '/admin-management' },
+    { label: 'Active Admins', value: overview.active_admins, description: 'Active admin accounts', icon: UserCheck, iconClasses: 'bg-success-surface text-success-foreground', to: '/admin-management' },
     { label: 'Rewards Redeemed', value: overview.rewards_summary.total_redemptions,
       description: overview.rewards_summary.period_label, icon: Gift },
   ];
@@ -19,15 +19,15 @@ export default function SuperAdminOverview({ overview }) {
         <p className="mt-1 text-sm text-gray-500">Current account totals and recent recorded activity.</p>
       </div>
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {cards.map(({ label, value, description, icon: Icon, to }) => {
+        {cards.map(({ label, value, description, icon: Icon, iconClasses, to }) => {
           const Card = to ? Link : 'article';
-          return <Card key={label} {...(to ? { to } : {})} className={`rounded-2xl border border-gray-200 bg-white p-6${to ? ' cursor-pointer transition hover:border-primary-border hover:bg-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary' : ''}`}>
+          return <Card key={label} {...(to ? { to } : {})} className={`rounded-2xl border border-gray-200 bg-white p-6${to ? ' cursor-pointer transition hover:border-primary-border hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary' : ''}`}>
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-selected text-primary">
-                <Icon size={22} strokeWidth={1.8} />
+              <div className={`lf-icon-badge ${iconClasses ?? 'lf-icon-brand'}`}>
+                <Icon size={22} strokeWidth={1.8} aria-hidden="true" />
               </div>
               <h3 className="text-sm font-semibold text-gray-500">{label}</h3>
-              {to && <ArrowRight size={16} aria-hidden="true" className="ml-auto shrink-0 text-gray-400" />}
+              {to && <ChevronRight size={18} aria-hidden="true" className="ml-auto shrink-0 text-primary" />}
             </div>
             <p className="mt-6 text-3xl font-bold text-gray-900">{value}</p>
             <p className="mt-1 text-xs text-gray-500">{description}</p>
@@ -41,7 +41,7 @@ export default function SuperAdminOverview({ overview }) {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-bold text-gray-800">Recent Admin Activity</h3>
           <Link to="/audit-logs" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-primary hover:bg-selected">
-            View Audit Logs <ArrowRight size={16} />
+            View Audit Logs <ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
         <ul className="divide-y divide-gray-100">

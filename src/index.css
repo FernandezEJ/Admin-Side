@@ -1,9 +1,17 @@
 @import "tailwindcss";
 
-/* LifeFlow v1.0: extend Tailwind's existing theme, including legacy neutral utilities. */
+/* LifeFlow Polish 1: brand sources, semantic feedback, and legacy utility aliases. */
 @theme {
-  --color-primary: #9B1238;
-  --color-primary-hover: #7D0F2D;
+  --font-sans: 'Nunito Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-weight-extrabold: 700;
+  --font-weight-black: 700;
+  --color-floral-white: #FFF9F2;
+  --color-pastel-pink: #FFCAD0;
+  --color-racing-red: #F10222;
+  --color-crushed-berry: #892325;
+  --color-rich-mahogany: #250202;
+  --color-primary: var(--color-crushed-berry);
+  --color-primary-hover: #6D1B1D;
   --color-primary-border: color-mix(in srgb, var(--color-primary) 25%, var(--color-surface));
   --color-danger: #B42318;
   --color-danger-hover: #912017;
@@ -14,7 +22,8 @@
   --color-success-hover: #166534;
   --color-success-surface: #ECFDF3;
   --color-success-foreground: #166534;
-  --color-warning: #EA580C;
+  /* Dark orange keeps white action labels readable; revision/warning meanings remain. */
+  --color-warning: #B45309;
   --color-warning-hover: #92400E;
   --color-warning-surface: #FFF7E6;
   --color-warning-foreground: #92400E;
@@ -23,14 +32,20 @@
   --color-info-hover: #1E40AF;
   --color-info-surface: #EFF6FF;
   --color-info-foreground: #1D4ED8;
-  --color-neutral: #64748B;
+  --color-neutral: #5F6B7A;
   --color-neutral-surface: #F1F5F9;
   --color-neutral-foreground: #475569;
-  --color-page: #F8FAFC;
+  --color-page: var(--color-floral-white);
   --color-surface: #FFFFFF;
-  --color-content: #0F172A;
+  --color-content: var(--color-rich-mahogany);
   --color-line: #E2E8F0;
-  --color-selected: #FFF1F3;
+  --color-selected: var(--color-pastel-pink);
+  --color-primary-soft: #FFF0F1;
+  --color-sidebar: var(--color-crushed-berry);
+  --color-sidebar-text: var(--color-floral-white);
+  --color-sidebar-muted: var(--color-pastel-pink);
+  --color-sidebar-hover: #701C1E;
+  --color-sidebar-line: #AF6264;
   --color-white: var(--color-surface);
   --color-gray-50: var(--color-page);
   --color-gray-100: var(--color-neutral-surface);
@@ -46,9 +61,43 @@
 }
 
 @layer base {
+  html { font-family: var(--font-sans); font-synthesis: none; }
   body { background-color: var(--color-page); color: var(--color-content); }
+  :is(h1, h2, h3, h4, h5, h6) { font-weight: 700; }
+  :where(button, input, select, textarea) { font: inherit; }
+  :where(button, [role="button"]) { font-weight: 600; }
   *, ::before, ::after { border-color: var(--color-line); }
   input::placeholder, textarea::placeholder { color: var(--color-neutral); }
+  :where(a[href], button:not(:disabled), [role="button"]:not([aria-disabled="true"])) { cursor: pointer; }
+  :where(a[href], button, [role="button"], input, select, textarea) {
+    transition-property: color, background-color, border-color, box-shadow;
+    transition-duration: 160ms;
+    transition-timing-function: ease-out;
+  }
+  :where(button:disabled, [aria-disabled="true"]) { cursor: not-allowed; }
+}
+
+/* Decorative icon badges only: no cursor, hover, or click affordance on their own. */
+@layer components {
+  .lf-icon-badge {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.75rem;
+  }
+  .lf-icon-badge > svg { width: 1.375rem; height: 1.375rem; stroke-width: 1.8; }
+  .lf-icon-brand { color: var(--color-primary); background-color: var(--color-primary-soft); }
+}
+
+/* Shared feedback only for existing actions; informational cards stay inert. */
+:where(button, a[href], [role="button"]).bg-primary:not(:disabled):not([aria-disabled="true"]):hover {
+  background-color: var(--color-primary-hover);
+}
+:where(button, a[href], [role="button"]):not(:disabled):not([aria-disabled="true"]):active {
+  filter: brightness(0.96);
 }
 
 /* Muted labels need the darker neutral on tinted selected/hovered cards. */
@@ -64,6 +113,12 @@ main table td { overflow-wrap: anywhere; }
 main input, main select, main textarea { max-width: 100%; }
 button, a, input, select, textarea { touch-action: manipulation; }
 :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  :where(a[href], button, [role="button"], input, select, textarea) {
+    transition-duration: 0s !important;
+  }
+}
 
 /* Form fields use their existing border as the sole focus indicator.
    Keep the global outline for buttons, links, and non-text input controls. */

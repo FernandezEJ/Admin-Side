@@ -1,3 +1,4 @@
+import { createReadGate } from './readFeedback';
 import { adminRequest } from './adminAuthApi';
 
 export const donorsApi = {
@@ -12,7 +13,8 @@ export const donorsApi = {
 
 export function createDonors(requestAdmin, api = donorsApi) {
   const filters = { searchTerm: '', selectedBloodType: 'all', selectedEligibility: 'all' };
-  let state = { data: null, loading: true, error: '', activeTab: 'all', page: 1, ...filters };
+  const readGate = createReadGate();
+  let state = { hasLoaded: false, data: null, loading: true, errorStatus: undefined, error: '', activeTab: 'all', page: 1, ...filters };
   let version = 0;
   const listeners = new Set();
   const update = (patch) => { state = { ...state, ...patch }; listeners.forEach((notify) => notify()); };
@@ -29,17 +31,20 @@ export function createDonors(requestAdmin, api = donorsApi) {
       return model.load({ page });
     },
     async load(patch = {}) {
+      const ticket = readGate.start(JSON.stringify({ page: state.page, searchTerm: state.searchTerm, selectedBloodType: state.selectedBloodType, selectedEligibility: state.selectedEligibility, ...patch }));
+      if (!ticket) return;
       const current = ++version;
       const request = { ...state, ...patch };
-      update({ ...patch, loading: true, error: '' });
+      update({ ...patch, loading: true, errorStatus: undefined, error: '' });
       try {
         const data = await requestAdmin((token) => api.load(token, request));
-        if (current === version) update({ data, page: data.pagination.currentPage, loading: false });
+        if (current === version) update({ data, page: data.pagination.currentPage, loading: false, hasLoaded: true });
       } catch (error) {
-        if (current === version) update({ loading: false, error: error.message });
+        if (current === version) update({ loading: false, errorStatus: error.status, error: error.message });
       }
+      finally { readGate.finish(ticket); }
     },
-    dispose() { version++; },
+    dispose() { readGate.clear(); version++; },
   };
   return model;
 }

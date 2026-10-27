@@ -1,3 +1,4 @@
+import { createReadGate } from './readFeedback';
 import { adminRequest } from './adminAuthApi';
 import { monthOptions } from '../data/monthOptions';
 
@@ -18,7 +19,8 @@ export const systemReportsApi = {
 };
 
 export function createSystemReports(requestAdmin, api = systemReportsApi, initial = currentReportPeriod(), print = () => window.print()) {
-  let state = { ...initial, snapshot: null, loading: true, error: '' };
+  const readGate = createReadGate();
+  let state = { hasLoaded: false, ...initial, snapshot: null, loading: true, errorStatus: undefined, error: '' };
   let version = 0;
   const listeners = new Set();
   const update = (patch) => { state = { ...state, ...patch }; listeners.forEach((notify) => notify()); };
@@ -28,18 +30,21 @@ export function createSystemReports(requestAdmin, api = systemReportsApi, initia
     subscribe(notify) { listeners.add(notify); return () => listeners.delete(notify); },
     canPrint,
     async load(filters = { year: state.year, month: state.month }) {
+      const ticket = readGate.start(JSON.stringify(filters));
+      if (!ticket) return;
       const current = ++version;
-      update({ ...filters, loading: true, error: '' });
+      update({ ...filters, loading: true, errorStatus: undefined, error: '' });
       try {
         const snapshot = await requestAdmin((token) => api.load(token, filters));
         if (current !== version) return false;
         if (snapshot.period !== `${filters.year}-${filters.month}`) throw new Error('The report period did not match your selection. Please retry.');
-        update({ snapshot, loading: false });
+        update({ snapshot, loading: false, hasLoaded: true });
         return true;
       } catch (error) {
-        if (current === version) update({ loading: false, error: error.message || 'Unable to load this report. Please retry.' });
+        if (current === version) update({ loading: false, errorStatus: error.status, error: error.message || 'Unable to load this report. Please retry.' });
         return false;
       }
+      finally { readGate.finish(ticket); }
     },
     setFilters(filters) {
       const next = { year: state.year, month: state.month, ...filters };
@@ -51,7 +56,7 @@ export function createSystemReports(requestAdmin, api = systemReportsApi, initia
       print();
       return true;
     },
-    dispose() { version++; },
+    dispose() { readGate.clear(); version++; },
   };
   return model;
 }

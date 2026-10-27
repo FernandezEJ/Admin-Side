@@ -6,11 +6,11 @@ import '../../styles/announcement-rich-text.css';
 const controls = [['bold', 'Bold', Bold], ['italic', 'Italic', Italic], ['insertUnorderedList', 'Bulleted list', List],
   ['insertOrderedList', 'Numbered list', ListOrdered], ['undo', 'Undo', Undo2], ['redo', 'Redo', Redo2]];
 
-export default function AnnouncementEditor({ value, onChange, disabled, submitted = false }) {
+export default function AnnouncementEditor({ value, onChange, disabled, submitted = false, required = true }) {
   const editor = useRef(null), selection = useRef(null), last = useRef('');
   const [active, setActive] = useState({});
   const [touched, setTouched] = useState(false);
-  const error = announcementContentError(value, touched || submitted);
+  const error = announcementContentError(value, submitted || (required && touched));
   useEffect(() => {
     const serialized = JSON.stringify(value);
     if (serialized !== last.current && validDocument(value)) {
@@ -62,9 +62,9 @@ export default function AnnouncementEditor({ value, onChange, disabled, submitte
       {controls.map(([name, label, Icon], index) => <button key={name} type="button" aria-label={label} title={label}
         aria-controls="description" aria-pressed={index < 4 ? Boolean(active[name]) : undefined} disabled={disabled}
         onMouseDown={(event) => event.preventDefault()} onClick={() => command(name)}
-        className={`flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 hover:bg-selected focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50 ${active[name] ? 'bg-selected text-primary' : ''}`}><Icon size={17} /></button>)}
+        className={`flex h-9 w-9 items-center justify-center rounded-lg text-primary hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50 ${active[name] ? 'bg-selected text-primary' : ''}`}><Icon size={17} aria-hidden="true" /></button>)}
     </div>
-    <div ref={editor} id="description" role="textbox" aria-label="Description" aria-multiline="true" aria-required="true" aria-disabled={disabled}
+    <div ref={editor} id="description" role="textbox" aria-label="Description" aria-multiline="true" aria-required={required} aria-disabled={disabled}
       aria-describedby="description-guidance" aria-invalid={Boolean(error)} contentEditable={!disabled} suppressContentEditableWarning
       onInput={changed} onPaste={paste} onDrop={(event) => event.preventDefault()}
       className="announcement-rich-text min-h-48 max-h-96 overflow-y-auto break-words px-4 py-3 text-sm leading-6 text-gray-800 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_strong]:font-bold [&_b]:font-bold [&_em]:italic [&_i]:italic" />

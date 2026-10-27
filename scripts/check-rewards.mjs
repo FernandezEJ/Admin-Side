@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
@@ -10,6 +12,9 @@ export async function checkRewards(server) {
   const { default: RewardsAnalytics } = await server.ssrLoadModule('/src/components/rewards/RewardsAnalytics.jsx');
   const { default: MonthFilter } = await server.ssrLoadModule('/src/components/ui/MonthFilter.jsx');
   const { RewardForm } = await server.ssrLoadModule('/src/pages/AddReward.jsx');
+  const { default: RewardPopup, RewardPopupView, RewardDetails } = await server.ssrLoadModule('/src/components/rewards/RewardPopup.jsx');
+  const { default: RewardCover } = await server.ssrLoadModule('/src/components/rewards/RewardCover.jsx');
+  const { default: AdminDialog } = await server.ssrLoadModule('/src/components/ui/AdminDialog.jsx');
   const { AdminSessionContext } = await server.ssrLoadModule('/src/auth/useAdminSession.js');
   const render = (Component, remote, extra = {}, role = 'admin') => renderToString(React.createElement(MemoryRouter, null,
     React.createElement(AdminSessionContext.Provider, { value: { role, isSuperAdmin: role === 'super_admin', currentAdmin: { name: 'Reward admin' } } },
@@ -90,7 +95,7 @@ export async function checkRewards(server) {
         const filter = nodes.find(node => node.props['aria-label'] === 'Category');
         assert.deepEqual(descendants(filter).filter(node => node.type === 'option').map(node => node.props.value),
           ['all', 'merchandise', 'apparel', 'vouchers']);
-        observed.push(nodes.filter(node => node.type === 'article').map(node => node.key));
+        observed.push(nodes.filter(node => node.props['aria-label']?.startsWith('View reward:')).map(node => node.key));
         if (step < selections.length) filter.props.onChange({ target: { value: selections[step++] } });
         return view;
       }
@@ -249,16 +254,87 @@ export async function checkRewards(server) {
     assert.equal(await edit.save({ ...data, name: 'Edited reward', expected_stock: 9 }), true);
     assert.equal(calls.at(-1).options.body.get('_method'), 'PUT');
     assert.equal(calls.at(-1).options.body.get('expected_stock'), '9');
+    const savedImage = { ...remote().items[0], id:81, name:'Saved shirt', category:'apparel', status:'active', stock:9, inventory_version:'inventory-original',
+      image_url:'https://media.test/saved.png', description:'Saved description', variants:[{size:'M',enabled:true,stock_quantity:9}] };
+    for(const role of ['admin','super_admin']) for(const status of ['active','inactive','deleted']){
+      let stage=0,entries=0,focuses=0;
+      const record={...savedImage,status,recoverable:true};
+      function OpenReward(){
+        const tree=RewardsView({remote:{...remote(),items:[record]},enterPopupHistory:id=>{entries++;assert.equal(id,81);}}),nodes=descendants(tree);
+        if(stage===0){stage++;nodes.find(node=>node.props['aria-label']===`Show ${status[0].toUpperCase()+status.slice(1)} rewards`).props.onClick();}
+        else if(stage===1){
+          stage++;const card=nodes.find(node=>node.props['aria-label']==='View reward: Saved shirt');assert.equal(card.props.type,'button');assert.equal(card.props['aria-haspopup'],'dialog');
+          assert.equal(descendants(card).filter(node=>node.type==='button').length,1);assert.ok(card.props.className.includes('hover:bg-primary-soft')&&card.props.className.includes('focus-visible:'));
+          assert.equal(descendants(card).filter(node=>node.props.size===18&&node.props['aria-hidden']==='true').length,1);
+          card.props.onClick({currentTarget:{focus:()=>focuses++}});card.props.onClick({currentTarget:{focus:()=>assert.fail('Duplicate open')}});
+        }else{const popup=nodes.find(node=>node.type===RewardPopup);assert.equal(popup.props.id,81);assert.equal(nodes.find(node=>node.props['aria-pressed']&&node.props['aria-label']?.startsWith('Show ')).props['aria-label'],`Show ${status[0].toUpperCase()+status.slice(1)} rewards`);}
+        return tree;
+      }
+      render(OpenReward,remote(),{},role);assert.equal(entries,1);assert.equal(focuses,1);
+      const detail=render(RewardPopupView,{item:record,loading:false,busy:false,error:'',model:edit},{onDismiss(){},onChanged(){}},role);
+      assert.ok(detail.includes('Reward Details')&&detail.includes('Saved description')&&detail.includes('Size M')&&detail.includes('9 available'));
+      assert.equal(detail.includes('>Edit Reward</button>'),status!=='deleted');assert.equal(detail.includes('>Delete</button>'),status!=='deleted');assert.equal(detail.includes('>Restore to Inactive</button>'),status==='deleted');
+      let mode=0;
+      if(status!=='deleted'){
+        function EditMode(){const tree=RewardPopupView({remote:{item:record,loading:false,busy:false,error:'',model:edit},onDismiss(){},onChanged(){}}),nodes=descendants(tree);if(mode++===0)nodes.find(node=>node.type==='button'&&node.props.children==='Edit Reward').props.onClick();else assert.ok(nodes.find(node=>node.type===RewardForm).props.popup);return tree;}
+        const html=render(EditMode,remote(),{},role);assert.equal((html.match(/<dialog\b/g)||[]).length,1);assert.ok(html.includes('Save Reward'));
+      }
+    }
+    const expired=render(RewardPopupView,{item:{...savedImage,status:'deleted',recoverable:false},loading:false,busy:false,error:'',model:edit},{onDismiss(){},onChanged(){}});
+    assert.match(expired,/<button[^>]*disabled=""[^>]*>Restore to Inactive<\/button>/);
+    assert.ok(!render(RewardPopupView,{item:null,loading:false,busy:false,error:'Not found',model:edit},{onDismiss(){},onChanged(){}}).includes('>Edit Reward</button>'));
+    const details=renderToString(React.createElement(RewardDetails,{item:{...savedImage,category:'vouchers',voucherValue:200}}));assert.ok(details.includes('Voucher Value')&&!details.includes('Size M'));
+    let dirtyStage=0,closed=0;
+    function DirtyEdit(){
+      const tree=RewardForm({remote:{item:savedImage,busy:false,error:'Save failed',model:edit},popup:true,onClose:()=>closed++}),nodes=descendants(tree);
+      if(dirtyStage===0){dirtyStage++;nodes.find(node=>node.props.name==='name').props.onChange({target:{name:'name',value:'Unsaved shirt'}});}
+      else if(dirtyStage===1){dirtyStage++;nodes.find(node=>node.type==='button'&&node.props.children==='Cancel').props.onClick();}
+      else if(dirtyStage===2){dirtyStage++;assert.equal(nodes.find(node=>node.type==='form').props.hidden,true);assert.equal(nodes.filter(node=>node.type===AdminDialog).length,0);nodes.find(node=>node.type==='button'&&node.props.children==='Keep Editing').props.onClick();}
+      else if(dirtyStage===3){dirtyStage++;assert.equal(nodes.find(node=>node.props.name==='name').props.value,'Unsaved shirt');nodes.find(node=>node.type==='button'&&node.props.children==='Cancel').props.onClick();}
+      else nodes.find(node=>node.type==='button'&&node.props.children==='Discard Changes').props.onClick();
+      return tree;
+    }
+    render(DirtyEdit,remote());assert.equal(closed,1);
+    let capture,saveStep=0,savedCalls=0,finishSave,savedNotice=0,submitted;
+    const saveModel={save:data=>{savedCalls++;submitted=data;return new Promise(resolve=>finishSave=resolve);}};
+    const createURL=URL.createObjectURL;URL.createObjectURL=()=> 'blob:reward-preview';
+    function SaveEdit(){
+      const tree=RewardForm({remote:{item:saveStep?{...savedImage,stock:15,inventory_version:'new-server-version'}:savedImage,busy:false,error:'',model:saveModel},popup:true,onSaved:()=>savedNotice++}),nodes=descendants(tree);
+      if(saveStep===0){saveStep++;nodes.find(node=>node.props.type==='file').props.onChange({target:{files:[new File(['image'],'new.png',{type:'image/png'})]}});}
+      else {assert.equal(nodes.find(node=>node.type===RewardCover).props.src,'blob:reward-preview');capture=nodes.find(node=>node.type==='form');}
+      return tree;
+    }
+    try{render(SaveEdit,remote());}finally{URL.createObjectURL=createURL;}
+    const firstSave=capture.props.onSubmit({preventDefault(){}});await capture.props.onSubmit({preventDefault(){}});assert.equal(savedCalls,1);
+    assert.equal(submitted.expected_stock,9);assert.equal(submitted.expected_inventory_version,'inventory-original');assert.equal(submitted.image.name,'new.png');assert.equal(submitted.variants[0].size,'M');
+    finishSave(false);await firstSave;assert.equal(savedNotice,0);const retrySave=capture.props.onSubmit({preventDefault(){}});finishSave(true);await retrySave;assert.equal(savedNotice,1);
+    for(const action of ['delete','restore']){
+      let phase=0,confirmation,transitions=0,completed=0,release;
+      const record={...savedImage,status:action==='delete'?'active':'deleted',recoverable:true};
+      function ConfirmReward(){
+        const tree=RewardPopupView({remote:{item:record,loading:false,busy:false,error:'',model:{transition:(id,received)=>{assert.equal(id,81);assert.equal(received,action);transitions++;return new Promise(resolve=>release=resolve);}}},onDismiss(){},onChanged:()=>completed++}),nodes=descendants(tree);
+        if(phase++===0)nodes.find(node=>node.type==='button'&&node.props.children===(action==='delete'?'Delete':'Restore to Inactive')).props.onClick();
+        else{assert.equal(nodes.filter(node=>node.type===AdminDialog).length,1);confirmation=nodes.find(node=>node.type==='button'&&node.props.children==='Confirm');}
+        return tree;
+      }
+      render(ConfirmReward,remote());assert.equal(transitions,0);confirmation.props.onClick();confirmation.props.onClick();assert.equal(transitions,1);release(false);await new Promise(resolve=>setImmediate(resolve));assert.equal(completed,0);
+      confirmation.props.onClick();release(true);await new Promise(resolve=>setImmediate(resolve));assert.equal(completed,1);
+    }
+    const cachedItems=list.getSnapshot().items;const background=list.load(undefined,{background:true});assert.equal(list.getSnapshot().loading,false);assert.equal(list.getSnapshot().items,cachedItems);await background;
+    const lastSuccessfulItems = list.getSnapshot().items;
     fail = true;
     await list.load();
     assert.ok(render(RewardsView, remote()).includes('Try again'));
+    assert.equal(list.getSnapshot().items, lastSuccessfulItems, 'Failed refresh preserves the successfully loaded catalogue');
+    const retainedHistory = render(RewardsView, remote(), { initialTab: 'redemptions' });
+    assert.ok(retainedHistory.includes('Real buyer') && !retainedHistory.includes('Loading page') && !retainedHistory.includes('No redemptions yet'), 'Failed refresh keeps real redemption history visible');
     fail = false;
     await list.load();
     assert.equal(remote().error, '');
     redemptions = [];
     await list.load();
-    assert.ok(render(RewardsView, remote(), { initialTab: 'redemptions' }).includes('No redemptions found'));
-    assert.ok(render(RewardsView, { ...remote(), items: [] }).includes('No rewards found'));
+    assert.ok(render(RewardsView, remote(), { initialTab: 'redemptions' }).includes('No redemptions yet'));
+    assert.ok(render(RewardsView, { ...remote(), items: [] }).includes('No rewards available yet'));
 
     let complete;
     let submissions = 0;
@@ -270,7 +346,9 @@ export async function checkRewards(server) {
     assert.equal(await first, true);
     const pending = [];
     const race = createRewards(run, 81, { detail: () => new Promise((resolve) => pending.push(resolve)) });
-    const older = race.load(); const newer = race.load();
+    const older = race.load(); await race.load();
+    assert.equal(pending.length, 1, 'Repeated detail Retry taps share the pending read');
+    race.dispose(); const newer = race.load();
     pending[1]({ name: 'Latest' }); await newer;
     pending[0]({ name: 'Stale' }); await older;
     assert.equal(race.getSnapshot().item.name, 'Latest');
@@ -296,6 +374,11 @@ export async function checkRewards(server) {
       .replace('data={chartData}', 'data={donationActivity}').replace('dataKey="label"', 'dataKey="month"')
       .replace(/\s*tickFormatter=\{\(label\) => label.slice\(0, 3\)\}/, '').replace('dataKey="redemptions"', 'dataKey="donations"').replace(/\s*name="Redeemed"/, '');
     assert.equal(chart.replace(/\s+/g, ' '), dashboard.replace(/\s+/g, ' '));
-    console.log('Rewards checks passed: three main tabs/four management cards, new and legacy categories, conditional value, Apparel form/size validation and nested inventory payload, management category choices limited to three physical categories, redemption Search/Status/Month/Clear order without category filtering, all status options and legacy records preserved, both roles, full-year Analytics with header year chevrons and bordered cards, local refresh/retry/empty, no month queries or inventory refetch, unchanged chart, transport/history/recovery and duplicate/stale requests.');
+    console.log('Rewards checks passed: preserved sections/cards/filters/analytics/history, both roles and all management statuses, single-target gallery/details/edit modals, missing/deleted/expired recovery, inline delete/restore confirmations and duplicate guards, retained dirty form/local cover, original stock/version payloads, retry/save/variants, quiet refresh, existing transport/lifecycle and stale guards.');
   } finally { globalThis.fetch = originalFetch; }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { createServer } = await import('vite');const server = await createServer({ server: { middlewareMode: true, hmr: false } });
+  try { await checkRewards(server); } finally { await server.close(); }
 }

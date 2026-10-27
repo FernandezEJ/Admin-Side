@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle2, MapPin, RotateCcw, UserRound, X, XCircle, ZoomIn } from 'lucide-react';
+import { ErrorState, PageSkeleton, LoadingNotice } from '../ui/PageState';
 import AdminDialog from '../ui/AdminDialog';
 import { formatDonorName } from '../../services/staffNames';
 import { useVerifications } from '../../services/useVerifications';
@@ -37,7 +38,7 @@ function ReviewPopupShell({ children, onClose, locked, fallbackFocusRef }) {
     }}>
     <header className="verification-review-header">
       <div><h2 id={titleId}>Verification Review</h2><p id={captionId}>Review the donor’s submitted proof before making a decision.</p></div>
-      <button type="button" disabled={locked} onClick={onClose} aria-label="Close verification review"><X size={17} aria-hidden="true" /></button>
+      <button type="button" disabled={locked} onClick={onClose} aria-label="Close verification review"><X size={20} aria-hidden="true" /></button>
     </header>
     {children}
   </dialog>;
@@ -58,8 +59,8 @@ export function VerificationProofViewer({ url, type, name, reload }) {
     <div className="verification-proof-toolbar">
       {name && <span className="verification-proof-filename" title={name}>{name}</span>}
       <div>
-        <button type="button" onClick={() => setRotation((value) => (value + 90) % 360)} aria-label="Rotate proof" title="Rotate proof"><RotateCcw size={14} aria-hidden="true" /></button>
-        <button type="button" onClick={() => setZoom((value) => value >= 2 ? 1 : value + 0.5)} aria-label={zoom >= 2 ? 'Reset proof zoom' : 'Zoom proof'} title={`Zoom: ${Math.round(zoom * 100)}%`}><ZoomIn size={14} aria-hidden="true" /></button>
+        <button type="button" onClick={() => setRotation((value) => (value + 90) % 360)} aria-label="Rotate proof" title="Rotate proof"><RotateCcw size={16} aria-hidden="true" /></button>
+        <button type="button" onClick={() => setZoom((value) => value >= 2 ? 1 : value + 0.5)} aria-label={zoom >= 2 ? 'Reset proof zoom' : 'Zoom proof'} title={`Zoom: ${Math.round(zoom * 100)}%`}><ZoomIn size={16} aria-hidden="true" /></button>
       </div>
     </div>
     {failed ? <div role="alert" className="verification-review-message">The image could not be displayed. <button type="button" onClick={reload}>Retry proof</button></div>
@@ -85,11 +86,11 @@ export function VerificationReviewPanel({ remote, onClose, onDecision, fallbackF
   const submission = useRef(false);
   const reasonId = useId();
   const visible = !!item && Object.hasOwn(VERIFICATION_STATUS_LABELS, item.status);
-  const canReview = visible && !loading && item.status === 'for_verification' && item.proof?.version?.length === 64;
+  const canReview = !remote.readFailed && visible && !loading && item.status === 'for_verification' && item.proof?.version?.length === 64;
   const hasProof = !!item?.proof;
   useEffect(() => {
-    if (!loading && visible && hasProof) void model.openProof();
-  }, [loading, visible, hasProof, item?.id, item?.proof?.version, model]);
+    if (!loading && !remote.readFailed && visible && hasProof && !proofUrl && !proofLoading && !proofError) void model.openProof();
+  }, [loading, remote.readFailed, visible, hasProof, item?.id, item?.proof?.version, model, proofUrl, proofLoading, proofError]);
   const closeConfirmation = () => { if (!busy && !submission.current) { setAction(null); setReason(''); } };
   const submit = async (event) => {
     event.preventDefault();
@@ -109,14 +110,14 @@ export function VerificationReviewPanel({ remote, onClose, onDecision, fallbackF
   };
   return <ReviewPopupShell onClose={onClose} locked={busy || !!action} fallbackFocusRef={fallbackFocusRef}>
     <div className="verification-review-content" aria-busy={loading}>
-      {loading && <p role="status" className="verification-review-message">Loading verification...</p>}
-      {error && <div role="alert" className="verification-review-error">{error}<button type="button" disabled={busy} onClick={model.load}>Refresh record</button></div>}
+      <LoadingNotice loading={loading || busy} hasData={!!item} />{loading && !item && <PageSkeleton variant="detail" />}
+      {error && <ErrorState description={error} status={remote.errorStatus} busy={loading || busy} onRetry={model.load} />}
       {!loading && !visible && !error && <p className="verification-review-message">No verification record to review.</p>}
-      {!loading && visible && <div className="verification-review-grid">
+      {visible && <div className="verification-review-grid">
         <section className="verification-review-card verification-submitted-proof">
           <h3>Submitted Proof</h3>
-          {proofLoading && <p role="status" className="verification-review-message">Loading private proof...</p>}
-          {proofError && <div role="alert" className="verification-review-error">{proofError}<button type="button" disabled={proofLoading} onClick={model.openProof}>Retry proof</button></div>}
+          <LoadingNotice loading={proofLoading} hasData={!!proofUrl} label="Loading private proof..." />{proofLoading && !proofUrl && <PageSkeleton variant="chart" label="Loading private proof" />}
+          {proofError && <ErrorState description={proofError} status={remote.proofErrorStatus} busy={proofLoading} onRetry={model.openProof} />}
           {!item.proof && <p className="verification-review-message">No proof has been submitted.</p>}
           {proofUrl && <VerificationProofViewer key={proofUrl} url={proofUrl} type={proofType} name={item.proof?.name} reload={model.openProof} />}
           {item.status !== 'for_verification' && <div className="verification-review-outcome">
@@ -127,7 +128,7 @@ export function VerificationReviewPanel({ remote, onClose, onDecision, fallbackF
         </section>
         <div className="verification-review-information">
         <section className="verification-review-card">
-          <h3><UserRound size={14} aria-hidden="true" />Donor Information</h3>
+          <h3><UserRound size={16} aria-hidden="true" />Donor Information</h3>
           <dl>
             <div className="verification-donor-name"><dt>Donor Name</dt><dd>{formatDonorName(item.donor?.name) || 'Unavailable donor'}</dd>
               {item.donor?.email && <dd className="verification-donor-email">{item.donor.email}</dd>}</div>
@@ -140,17 +141,17 @@ export function VerificationReviewPanel({ remote, onClose, onDecision, fallbackF
         <section className="verification-review-card verification-donation-card">
           <h3>Donation Information</h3>
           <p className="verification-donation-title">{item.opportunity?.title || 'Donation activity'}</p>
-          {item.opportunity?.location && <p className="verification-donation-line"><MapPin size={13} aria-hidden="true" /><span>{item.opportunity.location}</span></p>}
-          {item.opportunity?.donation_date && <p className="verification-donation-line"><CalendarDays size={13} aria-hidden="true" /><span>{new Date(`${item.opportunity.donation_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span></p>}
+          {item.opportunity?.location && <p className="verification-donation-line"><MapPin size={16} aria-hidden="true" /><span>{item.opportunity.location}</span></p>}
+          {item.opportunity?.donation_date && <p className="verification-donation-line"><CalendarDays size={16} aria-hidden="true" /><span>{new Date(`${item.opportunity.donation_date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span></p>}
         </section>
         </div>
       </div>}
     </div>
     <footer className="verification-review-footer">
       {canReview ? <>
-        <button type="button" className="verification-decision-revision" disabled={busy || !!action} onClick={() => setAction('needs-revision')}><RotateCcw size={13} aria-hidden="true" /><span>Needs Revision</span></button>
-        <button type="button" className="verification-decision-reject" disabled={busy || !!action} onClick={() => setAction('reject')}><XCircle size={13} aria-hidden="true" /><span>Reject Permanently</span></button>
-        <button type="button" className="verification-decision-approve" disabled={busy || !!action} onClick={() => setAction('approve')}><CheckCircle2 size={13} aria-hidden="true" /><span>Approve</span></button>
+        <button type="button" className="verification-decision-revision" disabled={busy || !!action} onClick={() => setAction('needs-revision')}><RotateCcw size={16} aria-hidden="true" /><span>Needs Revision</span></button>
+        <button type="button" className="verification-decision-reject" disabled={busy || !!action} onClick={() => setAction('reject')}><XCircle size={16} aria-hidden="true" /><span>Reject Permanently</span></button>
+        <button type="button" className="verification-decision-approve" disabled={busy || !!action} onClick={() => setAction('approve')}><CheckCircle2 size={16} aria-hidden="true" /><span>Approve</span></button>
       </> : <div className="verification-review-readonly"><p>{loading ? 'Loading record...' : item?.status === 'needs_revision' ? 'Waiting for replacement proof before another review.' : 'This record is read-only.'}</p><button type="button" disabled={busy} onClick={onClose}>Close</button></div>}
     </footer>
     {action && <AdminDialog title={action === 'approve' ? 'Approve Verification' : action === 'needs-revision' ? 'Request Proof Revision' : 'Reject Verification'} onClose={closeConfirmation} closeDisabled={busy}>

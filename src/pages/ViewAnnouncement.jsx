@@ -1,7 +1,7 @@
 import { useAnnouncements } from '../services/useAnnouncements';
 import AnnouncementBody from '../components/announcements/AnnouncementBody';
 import { formatDonorName } from '../services/staffNames';
-import { ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { ErrorState, PageSkeleton, LoadingNotice } from '../components/ui/PageState';
 import { ArrowLeft, MapPin, CalendarDays, Users } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
@@ -37,11 +37,11 @@ function ViewAnnouncement() {
               onClick={() => navigate('/announcements')}
               className="mb-5 flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-primary"
             >
-              <ArrowLeft size={17} />
+              <ArrowLeft size={17} aria-hidden="true" />
               Back to Announcements
             </button>
 
-            {loading ? <PageSkeleton /> : error ? <ErrorState description={error} onRetry={model.load} /> : announcement && <AnnouncementDetails announcement={announcement}
+            <LoadingNotice loading={loading} hasData={!!announcement} />{error && <ErrorState description={error} status={remote.errorStatus} busy={loading} onRetry={model.load} />}{loading && !announcement ? <PageSkeleton variant="detail" /> : announcement && <AnnouncementDetails announcement={announcement}
               onViewParticipants={() => { setShowParticipants(true); void model.loadParticipants(); }} />}
           </div>
         </div>
@@ -85,14 +85,14 @@ export function AnnouncementPopupView({ remote, onClose, onEdit, onAction }) {
   return <div className="announcement-popup">
     <AdminDialog title={participantsOpen ? 'Joined Participants' : 'View Announcement'} onClose={onClose} dismissOnBackdrop closeDisabled={busy}>
       <div className="announcement-popup-content">
-      {participantsOpen ? <AnnouncementParticipants remote={remote} /> : loading ? <PageSkeleton /> : !item ? <ErrorState description={error || 'Announcement not found.'} onRetry={model.load} /> : <>
-        {error && <p role="alert" className="mb-4 text-sm text-danger-foreground">{error}</p>}
+      <LoadingNotice loading={loading} hasData={!!item} />{participantsOpen ? <AnnouncementParticipants remote={remote} /> : loading && !item ? <PageSkeleton variant="detail" /> : !item ? <ErrorState description={error || 'Announcement not found.'} status={remote.errorStatus ?? (!error ? 404 : undefined)} busy={loading} onRetry={model.load} /> : <>
+        {error && <ErrorState description={error} status={remote.errorStatus} busy={loading} onRetry={model.load} />}
         <AnnouncementDetails announcement={item} compact participantButtonRef={participantsButton}
           onViewParticipants={() => { setParticipantsOpen(true); void model.loadParticipants(); }} />
       </>}
       </div>
       {participantsOpen ? <div className="announcement-popup-footer"><button type="button" onClick={backToDetails}
-        className="min-h-11 rounded-xl border border-gray-300 px-4 text-sm font-semibold text-gray-600 hover:bg-gray-50">Back to Announcement</button></div> : !loading && item &&
+        className="min-h-11 rounded-xl border border-gray-300 px-4 text-sm font-semibold text-gray-600 hover:bg-gray-50">Back to Announcement</button></div> : item &&
         <div className="announcement-popup-footer">
           {item.status !== 'deleted' ? <>
             <button type="button" disabled={busy} onClick={onEdit}
@@ -129,7 +129,7 @@ export function AnnouncementDetails({ announcement, compact = false, onViewParti
                 </div>
 
                 <div className="announcement-location mt-5 flex items-center gap-2 text-sm text-gray-500">
-                  <MapPin size={17} />
+                  <MapPin size={17} aria-hidden="true" className="shrink-0 text-primary" />
                   {announcement.location}
                 </div>
 
@@ -143,7 +143,7 @@ export function AnnouncementDetails({ announcement, compact = false, onViewParti
                     </p>
 
                     <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                      <CalendarDays size={15} />
+                      <CalendarDays size={17} aria-hidden="true" className="shrink-0 text-primary" />
                       {announcement.donationDate}
                     </p>
                   </div>
@@ -177,7 +177,7 @@ export function JoinedParticipants({ announcement, onView, buttonRef }) {
   const preview = (Array.isArray(announcement.participants_preview) ? announcement.participants_preview : []).filter((donor) => typeof donor?.name === 'string' && donor.name.trim()).slice(0, 3);
   return <section aria-label="Joined Participants" className="mt-4 rounded-xl border border-gray-200 p-3">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h3 className="flex items-center gap-2 text-sm font-semibold text-gray-800"><Users size={16} aria-hidden="true" />Joined Participants</h3>
+      <div><h3 className="flex items-center gap-2 text-sm font-semibold text-gray-800"><Users size={17} aria-hidden="true" className="shrink-0 text-primary" />Joined Participants</h3>
         <p className="mt-1 text-xs text-gray-500">{known ? `${announcement.participants_count} joined` : 'Participant count unavailable'}</p>
       </div>
       {onView && <button ref={buttonRef} type="button" disabled={!known} onClick={onView}
@@ -203,16 +203,16 @@ export function AnnouncementParticipants({ remote }) {
   return <section aria-busy={loading}>
     <h3 ref={heading} tabIndex={-1} className="text-sm font-semibold text-gray-800 outline-none">Participation history</h3>
     <p className="mt-1 text-xs leading-5 text-gray-500">Joined count excludes cancelled entries. History includes all saved participation records.</p>
-    {error ? <ErrorState description={error} onRetry={() => model.loadParticipants(participantsPage)} /> : loading && !meta ? <PageSkeleton /> : <>
+    <LoadingNotice requestKey={participantsPage} loading={loading} hasData={!!meta} />{error && <ErrorState description={error} status={remote.participantsErrorStatus} busy={loading} onRetry={() => model.loadParticipants(participantsPage)} />}{loading && !meta ? <PageSkeleton variant="table" columns={3} /> : <>
       {meta && <p className="my-3 text-xs text-gray-500" role="status">{meta.total} participation {meta.total === 1 ? 'record' : 'records'}</p>}
-      {participants.length === 0 && !loading ? <p role="status" className="py-6 text-center text-sm text-gray-500">No participants have joined this announcement.</p> :
+      {participants.length === 0 && !loading && !error && meta ? <p role="status" className="py-6 text-center text-sm text-gray-500">No participants have joined this announcement.</p> :
         <ul aria-label="Announcement participants" className="divide-y divide-gray-100">{participants.map((entry) => <li key={entry.id} className="py-3">
           <div className="flex flex-wrap items-center justify-between gap-2"><p className="min-w-0 break-words text-sm font-semibold text-gray-800">{formatDonorName(entry.donor?.name) || 'Unavailable donor'}</p>
             <span className={`rounded-full px-2 py-1 text-xs ${entry.status === 'completed' ? 'bg-success-surface text-success-foreground' : entry.status === 'rejected' ? 'bg-danger-surface text-danger-foreground' : ['pending', 'for_verification', 'needs_revision'].includes(entry.status) ? 'bg-warning-surface text-warning-foreground' : 'bg-neutral-surface text-neutral-foreground'}`}>{participantLabels[entry.status] ?? 'Unknown status'}</span></div>
           <p className="mt-1 text-xs text-gray-500">Joined {joinedDate(entry.joined_at)}</p>
           {entry.cancelled_at && <p className="mt-1 text-xs text-gray-500">Cancelled {joinedDate(entry.cancelled_at)}</p>}
         </li>)}</ul>}
-      {loading && <p role="status" className="my-2 text-xs text-gray-500">Loading participation history...</p>}
+
       {meta && meta.last_page > 1 && <nav aria-label="Participation pages" className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <button type="button" disabled={loading || meta.current_page <= 1} onClick={() => model.loadParticipants(meta.current_page - 1)} className="min-h-10 rounded-lg border px-3 text-xs disabled:opacity-50">Previous</button>
         <span className="text-xs text-gray-500">Page {meta.current_page} of {meta.last_page}</span>

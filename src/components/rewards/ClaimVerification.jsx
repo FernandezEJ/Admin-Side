@@ -1,8 +1,10 @@
+import { LoadingNotice } from '../ui/PageState';
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useAdminSession } from '../../auth/useAdminSession';
 import { formatDonorName } from '../../services/staffNames';
 import { canConfirmClaim, claimStatusLabel, createRewardClaims } from '../../services/rewardClaims';
 import AdminDialog from '../ui/AdminDialog';
+import { claimCodeSuffix } from '../../services/claimCodeInput';
 
 const buttonBase = 'min-h-11 rounded-xl px-5 py-3 text-sm font-semibold text-white transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60';
 const primaryButton = `${buttonBase} bg-primary hover:bg-primary-hover`;
@@ -28,20 +30,25 @@ export default function ClaimVerification({ onClaimed }) {
 export function ClaimVerificationView({ state, model, inputRef, confirmRef, markRef }) {
   const busy = state.verifying || state.confirming || state.refreshing;
   const { claim } = state;
+  const suffix = claimCodeSuffix(state.code);
   return <div id="reward-claim-verification" className="p-4 sm:p-6">
     <div className="max-w-xl">
       <h3 className="text-lg font-bold text-gray-800">Claim Verification</h3>
       <p className="mt-2 text-sm leading-6 text-gray-500">Verify the donor’s code, hand over the item, then confirm the claim.</p>
-      <form className="mt-5" onSubmit={(event) => { event.preventDefault(); void model.verify(); }} aria-busy={state.verifying}>
+      <LoadingNotice loading={busy} label="Checking the claim..." /><form className="mt-5" onSubmit={(event) => { event.preventDefault(); void model.verify(); }} aria-busy={state.verifying}>
         <label htmlFor="reward-claim-code" className="block text-sm font-semibold text-gray-700">One-Time Claim Code</label>
         <div className="mt-2 flex flex-col gap-3 sm:flex-row">
-          <input ref={inputRef} id="reward-claim-code" name="claim-code" value={state.code} onChange={(event) => model.setCode(event.target.value)}
-            placeholder="LFW-XXXXXX" autoComplete="off" autoCapitalize="characters" spellCheck={false} disabled={busy || !!claim}
-            aria-invalid={!!state.error} aria-describedby={state.error ? 'claim-code-help claim-code-error' : 'claim-code-help'}
-            className="min-h-11 min-w-0 flex-1 rounded-xl border border-gray-200 px-4 py-3 font-mono text-base uppercase text-gray-800 disabled:bg-gray-50" />
-          <button type="submit" disabled={busy || !!claim} className={primaryButton}>{state.verifying ? 'Verifying...' : 'Verify Code'}</button>
+          <div role="group" aria-label="Claim code" className="flex min-w-0 flex-1 items-stretch overflow-hidden rounded-xl border border-gray-200 focus-within:border-primary focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary">
+            <span id="claim-code-prefix" className="flex select-none items-center border-r border-gray-200 bg-gray-50 px-3 font-mono font-semibold text-gray-700">LFW-</span>
+            <input ref={inputRef} id="reward-claim-code" name="claim-code" value={suffix} maxLength={6} pattern="[A-Z0-9]{6}" onChange={(event) => model.setCode(`LFW-${claimCodeSuffix(event.target.value)}`)}
+              onPaste={(event) => { event.preventDefault();if (!busy && !claim) model.setCode(`LFW-${claimCodeSuffix(event.clipboardData.getData('text'))}`); }}
+              placeholder="XXXXXX" autoComplete="off" autoCapitalize="characters" spellCheck={false} disabled={busy || !!claim}
+              aria-invalid={!!state.error} aria-describedby={`claim-code-prefix claim-code-help${state.error ? ' claim-code-error' : ''}`}
+              className="min-h-11 w-full min-w-0 flex-1 border-0 px-3 py-3 font-mono text-base uppercase text-gray-800 disabled:bg-gray-50" />
+          </div>
+          <button type="submit" disabled={busy || !!claim || suffix.length !== 6} className={primaryButton}>{state.verifying ? 'Verifying...' : 'Verify Code'}</button>
         </div>
-        <p id="claim-code-help" className="mt-2 text-xs leading-5 text-info">Enter LFW- followed by six letters or numbers.</p>
+        <p id="claim-code-help" className="mt-2 text-xs leading-5 text-info">Enter six letters or numbers after LFW-. You can also paste the complete code.</p>
         {state.error && <p id="claim-code-error" role="alert" className="mt-3 text-sm text-danger-foreground">{state.error}</p>}
         {state.notice && <p role="status" className="mt-3 text-sm text-success-foreground">{state.notice}</p>}
       </form>

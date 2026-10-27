@@ -1,3 +1,4 @@
+import { createReadGate } from './readFeedback';
 import { adminRequest } from './adminAuthApi';
 
 export const rewardRow = (item) => ({ ...item, voucherValue: item.voucher_value == null ? null : Number(item.voucher_value), pointsRequired: item.points_cost, stock: item.stock_quantity });
@@ -45,7 +46,8 @@ export function validateReward(data) {
 
 export function createRewards(requestAdmin, id, api = rewardsApi) {
   const year = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila', year: 'numeric' });
-  let state = { items: [], redemptions: [], analytics: null, item: null, year, loading: id !== 'new', analyticsLoading: false, analyticsError: '', busy: false, error: '' };
+  const readGate = createReadGate(), analyticsGate = createReadGate();
+  let state = { hasLoaded: false, items: [], redemptions: [], analytics: null, item: null, year, loading: id !== 'new', analyticsLoading: false, analyticsError: '', busy: false, errorStatus: undefined, error: '' };
   let version = 0;
   let analyticsVersion = 0;
   const listeners = new Set();
@@ -54,11 +56,14 @@ export function createRewards(requestAdmin, id, api = rewardsApi) {
   const model = {
     getSnapshot: () => state,
     subscribe(notify) { listeners.add(notify); return () => listeners.delete(notify); },
-    async load(year = state.year) {
-      const current = ++version;
+    async load(year = state.year, { background = false } = {}) {
       if (id === 'new') return;
+      const ticket = readGate.start(String(year));
+      if (!ticket) return;
+      const current = ++version;
+      analyticsGate.clear();
       const currentAnalytics = ++analyticsVersion;
-      update({ year, loading: true, error: '', analyticsLoading: false, analyticsError: '' });
+      update({ readFailed: false, refreshing: background, year, loading: !background || !state.hasLoaded, errorStatus: undefined, error: '', analyticsLoading: false, analyticsError: '' });
       try {
         const result = id ? { item: await requestAdmin((token) => api.detail(token, id)) }
           : await requestAdmin(async (token) => {
@@ -67,12 +72,15 @@ export function createRewards(requestAdmin, id, api = rewardsApi) {
           });
         if (current === version) {
           if (currentAnalytics !== analyticsVersion) delete result.analytics;
-          update({ ...result, loading: false });
+          update({ ...result, refreshing: false, loading: false, hasLoaded: true });
         }
-      } catch (error) { if (current === version) update({ loading: false, error: message(error) }); }
+      } catch (error) { if (current === version) update({ readFailed: true, refreshing: false, loading: false, errorStatus: error.status, error: message(error) }); }
+      finally { readGate.finish(ticket); }
     },
     async loadAnalytics(year = state.year) {
       if (id) return false;
+      const ticket = analyticsGate.start(String(year));
+      if (!ticket) return false;
       const current = ++analyticsVersion;
       update({ year, analyticsLoading: true, analyticsError: '' });
       try {
@@ -81,13 +89,14 @@ export function createRewards(requestAdmin, id, api = rewardsApi) {
         update({ analytics, analyticsLoading: false });
         return true;
       } catch (error) {
-        if (current === analyticsVersion) update({ analyticsLoading: false, analyticsError: message(error) });
+        if (current === analyticsVersion) update({ analyticsLoading: false, analyticsErrorStatus: error.status, analyticsError: message(error) });
         return false;
-      }
+      } finally { analyticsGate.finish(ticket); }
     },
     async refreshClaims() {
       if (id) return false;
       const current = version;
+      analyticsGate.clear();
       const currentAnalytics = ++analyticsVersion;
       try {
         const result = await requestAdmin(async (token) => {
@@ -96,7 +105,7 @@ export function createRewards(requestAdmin, id, api = rewardsApi) {
         });
         if (current !== version) return false;
         if (currentAnalytics !== analyticsVersion) delete result.analytics;
-        update({ ...result, error: '', ...(currentAnalytics === analyticsVersion ? { analyticsLoading: false, analyticsError: '' } : {}) });
+        update({ ...result, errorStatus: undefined, error: '', ...(currentAnalytics === analyticsVersion ? { analyticsLoading: false, analyticsError: '' } : {}) });
         return true;
       } catch (error) {
         if (current === version) update({ error: `Claim saved, but Rewards data could not be refreshed. ${message(error)}`, ...(currentAnalytics === analyticsVersion ? { analyticsLoading: false } : {}) });
@@ -106,30 +115,30 @@ export function createRewards(requestAdmin, id, api = rewardsApi) {
     async save(data) {
       if (state.busy) return false;
       const error = validateReward(data);
-      if (error) { update({ error }); return false; }
+      if (error) { update({ errorStatus: undefined, error }); return false; }
       const current = version;
-      update({ busy: true, error: '' });
+      update({ busy: true, errorStatus: undefined, error: '' });
       try {
         const item = await requestAdmin((token) => api.save(token, data, id === 'new' ? undefined : id));
         if (current !== version) return false;
         update({ item });
         return true;
-      } catch (error) { if (current === version) update({ error: message(error) }); return false; }
+      } catch (error) { if (current === version) update({ errorStatus: error.status, error: message(error) }); return false; }
       finally { if (current === version) update({ busy: false }); }
     },
     async transition(itemId, action) {
       if (state.busy) return false;
       const current = version;
-      update({ busy: true, error: '' });
+      update({ busy: true, errorStatus: undefined, error: '' });
       try {
         await requestAdmin((token) => api.transition(token, itemId, action));
         if (current !== version) return false;
         await model.load();
         return true;
-      } catch (error) { if (current === version) update({ error: message(error) }); return false; }
+      } catch (error) { if (current === version) update({ errorStatus: error.status, error: message(error) }); return false; }
       finally { update({ busy: false }); }
     },
-    dispose() { version++; analyticsVersion++; },
+    dispose() { readGate.clear(); analyticsGate.clear(); version++; analyticsVersion++; },
   };
   return model;
 }

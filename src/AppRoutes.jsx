@@ -10,6 +10,9 @@ import Announcements from './pages/Announcements';
 import CreateAnnouncement from './pages/CreateAnnouncement';
 import ViewAnnouncement from './pages/ViewAnnouncement';
 import EditAnnouncement from './pages/EditAnnouncement';
+import EducationalContent from './pages/EducationalContent';
+import EducationalArticleForm from './pages/EducationalArticleForm';
+import EducationalArticleDetail from './pages/EducationalArticleDetail';
 import Verification from './pages/Verification';
 import VerificationDetail from './pages/VerificationDetail';
 import Donors from './pages/Donors';
@@ -34,6 +37,10 @@ export function AppRoutes() {
         <Route path="/announcements/create" element={<CreateAnnouncement />} />
         <Route path="/announcements/:id" element={<ViewAnnouncement />} />
         <Route path="/announcements/:id/edit" element={<EditAnnouncement />} />
+        <Route path="/educational-content" element={<EducationalContent />} />
+        <Route path="/educational-content/create" element={<EducationalArticleForm />} />
+        <Route path="/educational-content/:id" element={<EducationalArticleDetail />} />
+        <Route path="/educational-content/:id/edit" element={<EducationalArticleForm />} />
         <Route path="/verification" element={<Verification />} />
         <Route path="/verification/:id" element={<VerificationDetail />} />
         <Route path="/donors" element={<Donors />} />

@@ -1,3 +1,4 @@
+import { createReadGate } from './readFeedback';
 import { adminRequest } from './adminAuthApi';
 
 export const VERIFICATION_STATUS_LABELS = Object.freeze({
@@ -23,7 +24,8 @@ export const verificationsApi = {
 };
 
 export function createVerifications(requestAdmin, id, api = verificationsApi, urls = URL) {
-  let state = { items: [], item: null, loading: true, busy: false, error: '', proofUrl: '', proofType: '', proofLoading: false, proofError: '' };
+  const readGate = createReadGate();
+  let state = { hasLoaded: false, items: [], item: null, loading: true, busy: false, error: '', proofUrl: '', proofType: '', proofLoading: false, proofError: '' };
   const listeners = new Set();
   let version = 0;
   const update = (patch) => { state = { ...state, ...patch }; listeners.forEach((notify) => notify()); };
@@ -31,13 +33,21 @@ export function createVerifications(requestAdmin, id, api = verificationsApi, ur
   const model = {
     getSnapshot: () => state,
     subscribe(notify) { listeners.add(notify); return () => listeners.delete(notify); },
-    async load() {
+    async load({ invalidate = false } = {}) {
+      const ticket = readGate.start('');
+      if (!ticket) return;
       const current = ++version;
-      clearProof(); update({ loading: true, error: '', ...(id ? { item: null } : {}) });
+      // A stale-review conflict invalidates private proof; routine reads keep the current view.
+      if (invalidate || state.proofLoading) clearProof();
+      update({ loading: true, readFailed: false, errorStatus: undefined, error: '', ...(id && invalidate ? { item: null } : {}) });
       try {
         const value = await requestAdmin((token) => id ? api.detail(token, id) : api.list(token));
-        if (current === version) update({ ...(id ? { item: value } : { items: value }), loading: false });
-      } catch (error) { if (current === version) update({ loading: false, error: error.message }); }
+        if (current === version) {
+          if (id && state.item?.proof?.version !== value.proof?.version) clearProof();
+          update({ ...(id ? { item: value } : { items: value }), loading: false, hasLoaded: true });
+        }
+      } catch (error) { if (current === version) update({ readFailed: true, loading: false, errorStatus: error.status, error: error.message }); }
+      finally { readGate.finish(ticket); }
     },
     async openProof() {
       if (!state.item?.proof || state.proofLoading) return;
@@ -46,10 +56,10 @@ export function createVerifications(requestAdmin, id, api = verificationsApi, ur
       try {
         const blob = await requestAdmin((token) => api.proof(token, id));
         if (current === version) update({ proofUrl: urls.createObjectURL(blob), proofType: blob.type, proofLoading: false });
-      } catch (error) { if (current === version) update({ proofLoading: false, proofError: error.message }); }
+      } catch (error) { if (current === version) update({ proofLoading: false, proofErrorStatus: error.status, proofError: error.message }); }
     },
     async review(action, reason = '') {
-      if (state.busy || state.loading || state.item?.status !== 'for_verification' || !['approve', 'needs-revision', 'reject'].includes(action) || state.item.proof?.version?.length !== 64) return false;
+      if (state.busy || state.loading || state.readFailed || state.item?.status !== 'for_verification' || !['approve', 'needs-revision', 'reject'].includes(action) || state.item.proof?.version?.length !== 64) return false;
       if (action !== 'approve' && !reason.trim()) { update({ error: 'Enter a reason.' }); return false; }
       let current = version;
       update({ busy: true, error: '' });
@@ -62,16 +72,16 @@ export function createVerifications(requestAdmin, id, api = verificationsApi, ur
       } catch (error) {
         if (current === version) {
           if (error.status === 409) {
-            const refresh = model.load();
+            const refresh = model.load({ invalidate: true });
             current = version;
             await refresh;
           }
-          if (current === version) update({ error: Object.values(error.errors ?? {}).flat().join(' ') || error.message });
+          if (current === version) update({ errorStatus: error.status, error: Object.values(error.errors ?? {}).flat().join(' ') || error.message });
         }
         return false;
       } finally { if (current === version) update({ busy: false }); }
     },
-    dispose() { version++; clearProof(); },
+    dispose() { readGate.clear(); version++; clearProof(); },
   };
   return model;
 }

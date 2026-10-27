@@ -1,5 +1,5 @@
 import { formatDonorName } from '../services/staffNames';
-import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { EmptyState, ErrorState, PageSkeleton, LoadingNotice, SkeletonValue } from '../components/ui/PageState';
 
 
 import {
@@ -59,7 +59,7 @@ export function DonorsView({ remote }) {
   const eligibleDonors = data?.summary.eligible;
   const temporarilyIneligibleDonors = data?.summary.temporarilyIneligible;
   const bloodTypes = data?.bloodTypes ?? [];
-  const pagination = data?.pagination;
+  const pagination = data?.pagination ?? { currentPage: 1, lastPage: 1 };
 
   // ============================================================
   // Leaderboard
@@ -119,9 +119,9 @@ export function DonorsView({ remote }) {
             </p>
           </section>
 
-          {loading && !data && <PageSkeleton />}
-          {!loading && error && <ErrorState title="Unable to load Donors" description={error} onRetry={() => model.load()} />}
-          {!error && data && <>
+          <LoadingNotice requestKey={JSON.stringify([remote.page, searchTerm, selectedBloodType, selectedEligibility])} loading={loading} hasData={!!data} />
+          {!loading && error && <ErrorState title="Unable to load Donors" description={error} compact={!!data} status={remote.errorStatus} busy={loading} onRetry={() => model.load()} />}
+          {<>
           {/* ==================================================
               Summary Cards
               ================================================== */}
@@ -134,12 +134,12 @@ export function DonorsView({ remote }) {
                   </p>
 
                   <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {totalDonors}
+                    {!data && loading ? <SkeletonValue /> : totalDonors ?? '—'}
                   </h3>
                 </div>
 
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-selected text-primary">
-                  <Users size={21} />
+                <div className="lf-icon-badge lf-icon-brand">
+                  <Users size={22} aria-hidden="true" />
                 </div>
               </div>
             </article>
@@ -152,12 +152,12 @@ export function DonorsView({ remote }) {
                   </p>
 
                   <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {eligibleDonors}
+                    {!data && loading ? <SkeletonValue /> : eligibleDonors ?? '—'}
                   </h3>
                 </div>
 
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-success-surface text-success-foreground">
-                  <CircleCheck size={21} />
+                <div className="lf-icon-badge bg-success-surface text-success-foreground">
+                  <CircleCheck size={22} aria-hidden="true" />
                 </div>
               </div>
             </article>
@@ -170,12 +170,12 @@ export function DonorsView({ remote }) {
                   </p>
 
                   <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {temporarilyIneligibleDonors}
+                    {!data && loading ? <SkeletonValue /> : temporarilyIneligibleDonors ?? '—'}
                   </h3>
                 </div>
 
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-warning-surface text-warning-foreground">
-                  <Clock3 size={21} />
+                <div className="lf-icon-badge bg-warning-surface text-warning-foreground">
+                  <Clock3 size={22} aria-hidden="true" />
                 </div>
               </div>
             </article>
@@ -209,7 +209,7 @@ export function DonorsView({ remote }) {
                       : 'border-transparent text-gray-400 hover:text-gray-700'
                   }`}
                 >
-                  <Trophy size={15} />
+                  <Trophy size={17} aria-hidden="true" />
                   Top Donors
                 </button>
               </div>
@@ -223,9 +223,8 @@ export function DonorsView({ remote }) {
                 {/* Search + Filters */}
                 <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">
                   <div className="relative min-w-0 w-full sm:min-w-64 flex-1">
-                    <Search
-                      size={17}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    <Search size={18} aria-hidden="true"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none"
                     />
 
                     <input
@@ -292,8 +291,8 @@ export function DonorsView({ remote }) {
                 </div>
 
                 {/* Keep wide tables inside their scrolling container. */}
-                {loading && <PageSkeleton />}
-                {!loading && <>
+
+                {<>
                 <div className="w-full overflow-x-auto">
                   <table className="w-full min-w-[640px] table-fixed text-left">
                     <thead>
@@ -322,7 +321,7 @@ export function DonorsView({ remote }) {
                       </tr>
                     </thead>
 
-                    <tbody>
+                    <tbody>{loading && !data && <tr><td colSpan={5}><PageSkeleton variant="table" header={false} /></td></tr>}
                       {donors.map((donor) => (
                         <tr
                           key={donor.id}
@@ -368,7 +367,7 @@ export function DonorsView({ remote }) {
                     </tbody>
                   </table>
 
-                  {donors.length === 0 && (
+                  {!loading && !error && donors.length === 0 && (
                     <EmptyState title={totalDonors === 0 ? 'No donors registered' : 'No donors found'}
                       description={totalDonors === 0 ? 'Active donor accounts will appear here.' : 'Try changing your search or filters.'} />
                   )}
@@ -376,9 +375,9 @@ export function DonorsView({ remote }) {
                 <nav aria-label="Donor pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-4 py-4 sm:px-6">
                   <p className="text-sm text-gray-500">Page {pagination.currentPage} of {pagination.lastPage}</p>
                   <div className="flex gap-2">
-                    <button type="button" disabled={pagination.currentPage <= 1} onClick={() => model.setPage(pagination.currentPage - 1)}
+                    <button type="button" disabled={loading || pagination.currentPage <= 1} onClick={() => model.setPage(pagination.currentPage - 1)}
                       className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">Previous</button>
-                    <button type="button" disabled={pagination.currentPage >= pagination.lastPage} onClick={() => model.setPage(pagination.currentPage + 1)}
+                    <button type="button" disabled={loading || pagination.currentPage >= pagination.lastPage} onClick={() => model.setPage(pagination.currentPage + 1)}
                       className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
                   </div>
                 </nav>
@@ -401,7 +400,7 @@ export function DonorsView({ remote }) {
                   </p>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-3">{loading && !data && <PageSkeleton variant="table" columns={3} />}
                   {topDonors.map((donor, index) => (
                     <div
                       key={donor.id}
@@ -449,7 +448,7 @@ export function DonorsView({ remote }) {
 
                     </div>
                   ))}
-                  {topDonors.length === 0 && <EmptyState title="No donors registered" description="Active donor accounts will appear here." />}
+                  {!loading && !error && topDonors.length === 0 && <EmptyState title="No donors registered" description="Active donor accounts will appear here." />}
                 </div>
               </div>
             )}

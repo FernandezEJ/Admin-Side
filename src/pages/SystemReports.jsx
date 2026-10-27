@@ -1,5 +1,5 @@
 import ReportChart from '../components/ReportChart';
-import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
+import { EmptyState, ErrorState, PageSkeleton, LoadingNotice } from '../components/ui/PageState';
 import { formatDonorName } from '../services/staffNames';
 import {
   Printer,
@@ -149,7 +149,7 @@ export function SystemReportsView({ remote }) {
                 disabled={!printable}
                 className="flex h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Printer size={17} />
+                <Printer size={17} aria-hidden="true" />
                 Print / Save Report
               </button>
             </div>
@@ -157,12 +157,12 @@ export function SystemReportsView({ remote }) {
 
           <p role="status" className="mb-4 flex items-start gap-2 text-sm text-gray-500 print:hidden">
             <span>Showing {selectedPeriodLabel}. Use Print / Save Report to print or choose Save as PDF in the browser print dialog.</span>
-            <LoaderCircle size={16} role="img" aria-label="Refreshing report" aria-hidden={!loading}
-              className={`mt-0.5 shrink-0 ${loading ? 'animate-spin text-gray-400' : 'opacity-0'}`} />
+            <LoaderCircle size={16} role="img" aria-label="Refreshing report" aria-hidden={!loading || !report}
+              className={`mt-0.5 shrink-0 ${loading && report ? 'motion-safe:animate-spin text-gray-400' : 'opacity-0'}`} />
           </p>
-          {!printable && <p className="report-print-status">The selected report is not ready. Finish loading or retry before printing.</p>}
-          {error && <div className="mb-4 print:hidden"><ErrorState title="Unable to load System Reports" description={error} onRetry={() => model.load()} /></div>}
-          {loading && !report && <div className="print:hidden"><PageSkeleton /></div>}
+          <div className="print:hidden"><LoadingNotice requestKey={`${selectedYear}-${selectedMonth}`} loading={loading} hasData={!!report} /></div>{!printable && <p className="report-print-status">The selected report is not ready. Finish loading or retry before printing.</p>}
+          {error && <div className="mb-4 print:hidden"><ErrorState title="Unable to load System Reports" description={error} compact={!!report} status={remote.errorStatus} busy={loading} onRetry={() => model.load()} /></div>}
+          {loading && !report && <div className="print:hidden"><PageSkeleton variant="report" /></div>}
           {report && <>
           {/* ==================================================
               Printable Report
@@ -174,8 +174,8 @@ export function SystemReportsView({ remote }) {
           >
             {/* Report Header */}
             <header className="border-b border-gray-200 pb-6 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-selected text-primary print:hidden">
-                <FileText size={23} />
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl lf-icon-brand print:hidden">
+                <FileText size={23} aria-hidden="true" />
               </div>
 
               <h1 className="mt-3 text-2xl font-bold text-gray-900">

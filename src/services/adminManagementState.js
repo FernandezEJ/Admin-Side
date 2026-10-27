@@ -1,3 +1,4 @@
+import { createReadGate } from './readFeedback';
 import { adminManagementApi } from './adminManagementApi';
 import { formatStaffName } from './staffNames';
 
@@ -13,8 +14,9 @@ export function formatAdminDate(value) {
 }
 
 export function createAdminManagement(requestAdmin, api = adminManagementApi) {
-  let state = { admins: [], summary: { total: 0, active: 0, deactivated: 0 }, search: '', statusTab: 'active',
-    loading: true, error: '', busy: false, modal: null, draft: { name: '', email: '' }, formError: '', notice: '', copyNotice: '' };
+  const readGate = createReadGate();
+  let state = { hasLoaded: false, admins: [], summary: { total: 0, active: 0, deactivated: 0 }, search: '', statusTab: 'active',
+    loading: true, errorStatus: undefined, error: '', busy: false, modal: null, draft: { name: '', email: '' }, formError: '', notice: '', copyNotice: '' };
   const listeners = new Set();
   let generation = 0;
   const update = (patch) => { state = { ...state, ...patch }; listeners.forEach((listener) => listener()); };
@@ -27,25 +29,28 @@ export function createAdminManagement(requestAdmin, api = adminManagementApi) {
   const details = (admin) => ({ type: 'details', admin, loading: false });
   const returnFromModal = () => {
     const admin = state.modal?.admin;
-    update({ modal: state.modal?.fromDetails && admin ? details(admin) : null, draft: { name: '', email: '' }, formError: '', copyNotice: '' });
+    update({ modal: state.modal?.fromDetails && admin ? details(admin) : null, draft: { name: '', email: '' }, formErrorStatus: undefined, formError: '', copyNotice: '' });
   };
   const model = {
     getSnapshot: () => state,
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     async load() {
+      const ticket = readGate.start('');
+      if (!ticket) return;
       const current = ++generation;
-      update({ loading: true, error: '' });
+      update({ loading: true, errorStatus: undefined, error: '' });
       try {
         const result = await run('list');
         if (current === generation) {
           const data = listState(result);
           const id = state.modal?.type === 'details' ? state.modal.admin?.id : null;
           const admin = id ? data.admins.find(row => row.id === id) : null;
-          update({ ...data, loading: false, ...(id ? { modal: details(admin), formError: admin ? '' : 'This Admin account is no longer available.' } : {}) });
+          update({ ...data, loading: false, hasLoaded: true, ...(id ? { modal: details(admin), formError: admin ? '' : 'This Admin account is no longer available.' } : {}) });
         }
       } catch (error) {
-        if (current === generation) update({ loading: false, error: error.message });
+        if (current === generation) update({ loading: false, errorStatus: error.status, error: error.message });
       }
+      finally { readGate.finish(ticket); }
     },
     setSearch: (search) => update({ search }),
     setTab: (statusTab) => { if (['active', 'deactivated', 'all'].includes(statusTab)) update({ statusTab }); },
@@ -53,23 +58,23 @@ export function createAdminManagement(requestAdmin, api = adminManagementApi) {
     async openDetails(admin) {
       if (state.busy || state.modal?.loading || !admin) return;
       const current = ++generation;
-      update({ modal: { ...details(admin), loading: true }, formError: '', copyNotice: '' });
+      update({ modal: { ...details(admin), loading: true }, formErrorStatus: undefined, formError: '', copyNotice: '' });
       try {
         const result = listState(await run('list'));
         if (current !== generation) return;
         const selected = result.admins.find(row => row.id === admin.id);
-        update({ ...result, loading: false, error: '', modal: details(selected), formError: selected ? '' : 'This Admin account is no longer available.' });
+        update({ ...result, loading: false, errorStatus: undefined, error: '', modal: details(selected), formError: selected ? '' : 'This Admin account is no longer available.' });
       } catch (error) {
-        if (current === generation) update({ loading: false, modal: { ...details(admin), unavailable: true }, formError: message(error) });
+        if (current === generation) update({ loading: false, modal: { ...details(admin), unavailable: true }, formErrorStatus: error.status, formError: message(error) });
       }
     },
     openEditor(admin = null) {
       if (state.busy || state.modal?.loading) return;
-      update({ modal: { type: 'edit', admin, fromDetails: state.modal?.type === 'details' }, draft: { name: admin?.name ?? '', email: admin?.email ?? '' }, formError: '', copyNotice: '' });
+      update({ modal: { type: 'edit', admin, fromDetails: state.modal?.type === 'details' }, draft: { name: admin?.name ?? '', email: admin?.email ?? '' }, formErrorStatus: undefined, formError: '', copyNotice: '' });
     },
     openAction(type, admin) {
       if (state.busy || state.modal?.loading || !admin || !['deactivate', 'reactivate'].includes(type)) return;
-      update({ modal: { type, admin, fromDetails: state.modal?.type === 'details' }, formError: '', copyNotice: '' });
+      update({ modal: { type, admin, fromDetails: state.modal?.type === 'details' }, formErrorStatus: undefined, formError: '', copyNotice: '' });
     },
     closeModal() {
       if (state.busy) return;
@@ -124,7 +129,7 @@ export function createAdminManagement(requestAdmin, api = adminManagementApi) {
         if (state.modal?.type === 'created') update({ copyNotice: 'Unable to copy. Select and copy the password manually.' });
       }
     },
-    dispose() { generation++; update({ modal: null, draft: { name: '', email: '' } }); },
+    dispose() { readGate.clear(); generation++; update({ modal: null, draft: { name: '', email: '' } }); },
   };
   return model;
 }

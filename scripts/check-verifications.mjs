@@ -3,6 +3,8 @@ import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { readFileSync } from 'node:fs';
+import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 export async function checkVerifications(server) {
   const { createVerifications, filterVerifications, verificationRow, VERIFICATION_STATUS_LABELS } = await server.ssrLoadModule('/src/services/verificationsApi.js');
@@ -55,17 +57,16 @@ export async function checkVerifications(server) {
     cardItems.push(verificationRow(unsubmitted));
     for (const role of ['admin', 'super_admin']) {
       const cardRemote = { items: cardItems, loading: false, error: '',
-        model: { load: () => assert.fail('Card/tab shortcuts must not refetch records') } };
+        model: { load: () => assert.fail('Status cards must not refetch records') } };
       const originalItems = JSON.stringify(cardItems);
       const beforeCalls = calls.length;
       const observed = [];
       const cardClick = (label) => (nodes) => nodes.find((node) => node.props['aria-label'] === `Show ${label} records`).props.onClick();
-      const tabClick = (label) => (nodes) => nodes.find((node) => node.type === 'button' && node.props.children === label).props.onClick();
       const actions = [cardClick('Need Revision'),
         (nodes) => nodes.filter((node) => node.type === 'select')[0].props.onChange({ target: { value: '10' } }),
         (nodes) => { nodes.find((node) => node.props['aria-label'] === 'Previous year').props.onClick(); nodes.find((node) => node.props['aria-label'] === 'Next year').props.onClick(); },
         (nodes) => nodes.find((node) => node.type === 'input').props.onChange({ target: { value: 'Matching' } }),
-        cardClick('Completed'), tabClick('Rejected'), cardClick('For Verification'), cardClick('Rejected'), tabClick('Need Revision')];
+        cardClick('Completed'), cardClick('Rejected'), cardClick('For Verification'), cardClick('Rejected'), cardClick('Need Revision')];
       let step = 0;
       // Exercise the actual handlers using React's render-phase state updates;
       // the component keeps its existing local tab and search/date state.
@@ -78,18 +79,20 @@ export async function checkVerifications(server) {
         assert.equal(selected.length, 1);
         const selectedIndex = cards.indexOf(selected[0]);
         const tabs = nodes.filter((node) => node.type === 'button' && labels.includes(node.props.children));
-        assert.equal(tabs.length, 4);
-        assert.ok(tabs[selectedIndex].props.className.includes('border-primary text-primary'), 'Cards and tabs use the same selected state');
+        assert.equal(tabs.length, 0, 'No duplicate text status tabs');
+        assert.equal(nodes.filter(node => node.props['aria-label'] === 'Verification status').length, 1);
         assert.ok(!nodes.some((node) => node.props.children === 'Pending' || node.props['aria-label']?.includes('Pending')));
         cards.forEach((card, index) => {
           assert.equal(card.props.type, 'button', 'Native buttons support keyboard activation');
           assert.equal(card.props['aria-label'], `Show ${labels[index]} records`);
           assert.ok(card.props.className.includes('cursor-pointer') && card.props.className.includes('hover:') && card.props.className.includes('focus-visible:'));
-          assert.ok(card.props.className.includes(card.props['aria-pressed'] ? 'border-primary-border bg-selected' : 'border-gray-200 bg-white'));
+          assert.ok(card.props.className.includes(card.props['aria-pressed'] ? 'border-primary bg-selected' : 'border-gray-200 bg-white'));
           const content = descendants(card);
           assert.equal(content.find((node) => node.type === 'span' && node.props.className?.includes('text-2xl')).props.children, index + 1,
             'Each status count is distinct and unchanged by search/date filters or Pending records');
-          assert.ok(content.some((node) => node.props.size === 16 && node.props['aria-hidden'] === 'true' && node.props.className.includes('shrink-0')), 'Small decorative arrow on every card');
+          assert.ok(content.some((node) => node.props.size === 18 && node.props['aria-hidden'] === 'true' && node.props.className.includes('shrink-0')), 'Small decorative chevron on every card');
+          const indicator = content.find(node => node.props.className?.includes('lf-icon-badge'));
+          assert.ok(indicator.props.className.includes(index === 2 ? 'text-success-foreground' : index === 3 ? 'text-danger-foreground' : 'text-warning-foreground'), 'Status indicators retain their semantic colors');
         });
         const body = nodes.find((node) => node.type === 'tbody');
         observed.push({ selectedIndex, rowIds: React.Children.toArray(body.props.children).map((row) => Number(row.key.match(/(\d+)$/)[1])),
@@ -106,7 +109,7 @@ export async function checkVerifications(server) {
       for (const [offset, expected] of [[5, 21], [6, 31], [7, 1], [8, 31], [9, 11]]) {
         assert.deepEqual(observed[offset].rowIds, [expected]);
         assert.equal(observed[offset].search, 'Matching');
-        assert.deepEqual(observed[offset].dates, ['10', currentYear], 'Card/tab clicks preserve search/month/year filters');
+        assert.deepEqual(observed[offset].dates, ['10', currentYear], 'Card clicks preserve search/month/year filters');
       }
       assert.ok(!html.includes('Pending') && !html.includes('Unsubmitted Donor'));
       assert.ok(html.includes('Matching needs_revision donor') && !html.includes('Other needs_revision donor'));
@@ -175,7 +178,7 @@ export async function checkVerifications(server) {
     await list.load();
     let html = render(VerificationView, { ...list.getSnapshot(), model: list });
     for (const label of ['For Verification', 'Need Revision', 'Completed', 'Rejected']) assert.ok(html.includes(label));
-    assert.ok(html.includes('View') && html.includes('Actions'));
+    assert.ok(!html.includes('View verification for') && !html.includes('Actions'));
     assert.ok(!html.includes('Pending') && !html.includes('Unsubmitted Donor') && !html.includes('value="2024"'));
     assert.equal(list.getSnapshot().items.find((item) => item.id === unsubmitted.id).status, 'pending', 'Backend Pending lifecycle data is preserved');
     assert.ok(!html.includes('<script>Donor</script>'));
@@ -223,49 +226,78 @@ export async function checkVerifications(server) {
     assert.ok(render(VerificationView, { ...list.getSnapshot(), model: list }).includes('role="alert"'));
     records = [unsubmitted]; await list.load();
     html = render(VerificationView, { ...list.getSnapshot(), model: list });
-    assert.ok(html.includes('No verification records found') && !html.includes('Pending') && !html.includes('Unsubmitted Donor'), 'Pending-only responses yield an empty review list');
+    assert.ok(html.includes('No requests in this status') && !html.includes('Pending') && !html.includes('Unsubmitted Donor'), 'Pending-only responses yield an empty review list');
     records = []; await list.load();
-    assert.ok(render(VerificationView, { ...list.getSnapshot(), model: list }).includes('No verification records found'));
+    assert.ok(render(VerificationView, { ...list.getSnapshot(), model: list }).includes('No requests in this status'));
     assert.ok(calls.some(({ path }) => path.endsWith('/needs-revision')));
     // Rows open a panel in place. Closing and successful decisions keep filters;
     // only a successful decision requests a fresh list/status-card snapshot.
-    for (const key of ['click', 'Enter', ' ', 'View']) {
-      let phase = 0, refreshes = 0, focuses = 0, prevented = 0, stopped = 0;
-      const checked = { items: [verificationRow({ ...record, status: 'for_verification', donor: { ...record.donor, name: 'Matching drawer donor' } })], loading: false, error: '', model: { load() { refreshes++; } } };
+    for (const role of ['admin', 'super_admin']) for (const status of statuses) for (const key of ['click', 'Enter', ' ']) {
+      let phase = 0, refreshes = 0, focuses = 0, prevented = 0;
+      const checkedRow = verificationRow({ ...record, status, proof_uploaded_at: `${currentYear}-09-30T17:00:00Z`, donor: { ...record.donor, name: 'Matching drawer donor' } });
+      const checked = { items: [checkedRow, { ...checkedRow, id: 19 }], loading: false, error: '', model: { load() { refreshes++; } } };
       function ExerciseRow() {
         const view = VerificationView({ remote: checked });
         const nodes = descendants(view);
+        const cleared = phase === 6;
         const search = nodes.find((node) => node.type === 'input');
         const drawer = nodes.find((node) => node.type === VerificationReviewDrawer);
         const rows = nodes.filter((node) => node.type === 'tr' && node.props.tabIndex === 0);
-        assert.equal(nodes.filter((node) => node.type === 'th').length, 6);
+        const headers = nodes.filter((node) => node.type === 'th');
+        assert.deepEqual(headers.map(node => node.props.children.trim()), ['Donor', 'Blood Type', 'Donation Event', 'Submitted', 'Status']);
         assert.equal(nodes.filter((node) => node.type === VerificationReviewDrawer).length, drawer ? 1 : 0);
-        if (phase === 0) { phase++; search.props.onChange({ target: { value: 'Matching' } }); }
+        for (const row of rows) {
+          const children = descendants(row);
+          assert.equal(children.filter(node => node.type === 'td').length, 5);
+          assert.equal(children.filter(node => node.type === 'button' || node.type === 'a').length, 0, 'The row is the single review target');
+          assert.ok(row.props.className.includes('hover:bg-primary-soft') && row.props.className.includes('focus-visible:'));
+          const indicators = children.filter(node => node.props.size === 17);
+          assert.equal(indicators.length, 1, 'Exactly one decorative chevron per record');
+          assert.equal(indicators[0].props['aria-hidden'], 'true');
+          assert.ok(indicators[0].props.className.includes('shrink-0'));
+        }
+        if (phase === 0) {
+          phase++; search.props.onChange({ target: { value: 'Matching' } });
+          nodes.find(node => node.props['aria-label'] === `Show ${VERIFICATION_STATUS_LABELS[status]} records`).props.onClick();
+          nodes.find(node => node.type === 'select').props.onChange({ target: { value: '10' } });
+          nodes.find(node => node.props['aria-label'] === 'Previous year').props.onClick();
+          nodes.find(node => node.props['aria-label'] === 'Next year').props.onClick();
+        }
         else if (phase === 1) {
           phase++; const row = rows[0];
           assert.equal(row.props['aria-haspopup'], 'dialog'); assert.match(row.props['aria-label'], /Matching drawer donor/);
-          const viewButton = descendants(row).find((node) => node.type === 'button');
-          assert.match(viewButton.props['aria-label'], /View verification for Matching/);
-          assert.equal(viewButton.props.type, 'button'); assert.equal(viewButton.props['aria-haspopup'], 'dialog');
           const rowTarget = { focus() { focuses++; }, closest() { return null; } };
-          const buttonTarget = { focus() { focuses++; }, closest() { return viewButton; } };
-          // Bubbled button keyboard/click events must not activate the row.
+          const buttonTarget = { closest() { return { tagName: 'BUTTON' }; } };
+          // Defensive nested-control guards stay even though the row has no buttons.
           row.props.onKeyDown({ key: 'Enter', target: buttonTarget, currentTarget: rowTarget, preventDefault() { assert.fail('Do not cancel native button keyboard activation'); } });
           row.props.onKeyDown({ key: ' ', target: buttonTarget, currentTarget: rowTarget, preventDefault() { assert.fail('Do not cancel native button keyboard activation'); } });
           row.props.onClick({ target: buttonTarget, currentTarget: rowTarget }); assert.equal(focuses, 0);
+          row.props.onKeyDown({ key: 'Enter', target: rowTarget, currentTarget: rowTarget, repeat: true, preventDefault() { assert.fail('Held key must not reopen review'); } });
+          assert.equal(focuses, 0);
           const event = { key, target: rowTarget, currentTarget: rowTarget, preventDefault() { prevented++; } };
           if (key === 'click') row.props.onClick(event);
-          else if (key === 'View') viewButton.props.onClick({ currentTarget: buttonTarget, stopPropagation() { stopped++; } });
           else row.props.onKeyDown(event);
-        } else if (phase === 2) { phase++; assert.equal(drawer.props.id, 9); assert.equal(search.props.value, 'Matching'); drawer.props.onClose(); }
+          row.props.onClick({ target: rowTarget, currentTarget: { focus() { assert.fail('Rapid duplicate activation must not refocus/reopen'); } } });
+          rows[1].props.onClick({ target: rowTarget, currentTarget: { focus() { assert.fail('Another record must not replace an open review'); } } });
+        } else if (phase === 2) { phase++; assert.equal(drawer.props.id, 9); assert.equal(search.props.value, 'Matching'); assert.equal(drawer.props.fallbackFocusRef, nodes.find(node => node.props['aria-label'] === 'Verification records').props.ref); drawer.props.onClose(); }
         else if (phase === 3) { phase++; assert.ok(!drawer); assert.equal(refreshes, 0); rows[0].props.onClick({ target: { closest() { return null; } }, currentTarget: { focus() {} } }); }
         else if (phase === 4) { phase++; drawer.props.onDecision(); }
-        else { assert.ok(!drawer); assert.equal(refreshes, 1); assert.equal(search.props.value, 'Matching'); }
+        else if (phase === 5) { phase++; assert.ok(!drawer); assert.equal(refreshes, 1); nodes.find(node => node.type === 'button' && node.props.children === 'Clear').props.onClick(); }
+        else { assert.ok(!drawer); assert.equal(refreshes, 1); assert.equal(search.props.value, ''); }
+        if (phase >= 2) {
+          assert.equal(search.props.value, cleared ? '' : 'Matching');
+          assert.equal(nodes.find(node => node.type === 'select').props.value, cleared ? 'all' : '10');
+          assert.equal(nodes.find(node => node.props['aria-label'] === 'All years').props.children, cleared ? 'All Years' : currentYear);
+          assert.equal(nodes.find(node => node.props['aria-label'] === `Show ${VERIFICATION_STATUS_LABELS[status]} records`).props['aria-pressed'], true);
+        }
         return view;
       }
-      renderToString(React.createElement(MemoryRouter, null, React.createElement(AdminSessionContext.Provider,
-        { value: { role: 'admin', currentAdmin: { name: 'Reviewer' } } }, React.createElement(ExerciseRow))));
-      assert.equal(focuses, 1); assert.equal(prevented, ['click', 'View'].includes(key) ? 0 : 1); assert.equal(stopped, key === 'View' ? 1 : 0);
+      const rowHtml = renderToString(React.createElement(MemoryRouter, null, React.createElement(AdminSessionContext.Provider,
+        { value: { role, currentAdmin: { name: 'Reviewer' } } }, React.createElement(ExerciseRow))));
+      const renderedBody = rowHtml.match(/<tbody>[\s\S]*?<\/tbody>/u)[0];
+      assert.equal((renderedBody.match(/<svg\b/g) ?? []).length, 2);
+      assert.equal((renderedBody.match(/class="[^"]*lucide-chevron-right[^"]*"/g) ?? []).length, 2);
+      assert.equal(focuses, 1); assert.equal(prevented, key === 'click' ? 0 : 1);
     }
     const submitted = { ...record, status: 'for_verification', revision_reason: null, rejection_reason: null, completion: null };
     const drawerRemote = { item: submitted, loading: false, busy: false, error: '', proofUrl: 'blob:secure-proof', proofType: 'image/png', proofLoading: false, proofError: '', model: { openProof() {}, load() {} } };
@@ -359,6 +391,12 @@ export async function checkVerifications(server) {
     const css = readFileSync('src/styles/verification-review.css', 'utf8');
     for (const value of ['width: min(1080px, calc(100vw - 48px))', 'margin: auto', 'inset: 0;', 'grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr)', 'overflow-y: auto', '::backdrop', '.verification-review-footer', 'flex: none', '@media (max-width: 720px)', '@media (max-width: 479px)']) assert.ok(css.includes(value), value);
     assert.ok(!css.includes('inset: 0 0 0 auto') && !css.includes('clamp(354px'));
-    console.log('Verification checks passed: preserved cards/filters/roles/deep links; six-column table with View and clickable keyboard rows sharing one popup; button propagation/keyboard guards; centered two-column proof-left/info-right modal with responsive footer; authenticated image/PDF, zoom/rotate and Blob cleanup; confirmations/reasons/duplicate guards; success close/list refresh, failures and stale-version recovery.');
+    console.log('Verification checks passed: four count/status cards without duplicate tabs; five-column row-only table with one chevron per record; click/Enter/Space for both roles/all statuses, repeat/nested/duplicate guards and retained search/month/year after close/decision; unchanged centered review, private image/PDF/zoom/rotate/Blob cleanup, confirmations/reasons/duplicate-submit guards, refresh/errors/stale-version recovery and deep links.');
   } finally { globalThis.fetch = originalFetch; }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { createServer } = await import('vite');
+  const server = await createServer({ server: { middlewareMode: true } });
+  try { await checkVerifications(server); } finally { await server.close(); }
 }

@@ -145,7 +145,7 @@ export async function checkDonors(server) {
     assert.equal(calls.length, count);
     response = pageReply(2);
     const nextPage = pageButton('Next').props.onClick();
-    assert.ok(render(pagingRemote()).includes('Loading page') && !render(pagingRemote()).includes('<table'));
+    assert.ok(!render(pagingRemote()).includes('Loading page') && render(pagingRemote()).includes('Paged donor 143') && render(pagingRemote()).includes('<table'), 'Pagination retains the successful page until replacement data arrives');
     assert.ok(render(pagingRemote()).includes('Search donor or blood type'), 'Search stays mounted while results load');
     await paging.setPage(2);
     assert.equal(calls.length, count + 1, 'Pending page navigation cannot be double-submitted');
@@ -203,11 +203,11 @@ export async function checkDonors(server) {
     status = 503; response = { message: 'Private server trace' };
     await model.load();
     let html = render(remote());
-    assert.ok(html.includes('Unable to load Donors') && html.includes('Try again'));
-    assert.ok(!html.includes('Private server trace') && !html.includes('<table'));
+    assert.ok(html.includes('Something went wrong on our side') && html.includes('Try again'));
+    assert.ok(!html.includes('Private server trace') && html.includes('<table'), 'Server errors retain cached donor rows');
     status = 200; response = fixture;
     const retry = model.load();
-    assert.ok(render(remote()).includes('Loading page') && !render(remote()).includes('<table'));
+    assert.ok(!render(remote()).includes('Loading page') && render(remote()).includes('<table'), 'Retry preserves the previously loaded donor table');
     await retry;
     assert.equal(model.getSnapshot().error, '');
     assert.ok(render(remote()).includes('Gold donor'));
@@ -240,8 +240,8 @@ export async function checkDonors(server) {
 
     const pending = [];
     const race = createDonors((operation) => operation('token'), { load: () => new Promise((resolve, reject) => pending.push({ resolve, reject })) });
-    const oldLoad = race.load();
-    const newest = race.load();
+    const oldLoad = race.load({ searchTerm: 'old' });
+    const newest = race.load({ searchTerm: 'newest' });
     pending[1].resolve(fixture);
     await newest;
     pending[0].reject(new Error('Stale error'));

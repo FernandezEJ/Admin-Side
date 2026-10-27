@@ -3,9 +3,9 @@ import { useRewards } from '../services/useRewards';
 import { formatDonorName } from '../services/staffNames';
 import { REWARD_CATEGORIES } from '../services/rewardsApi';
 import { filterRedemptions } from '../data/rewardRedemptions';
-import { EmptyState, ErrorState, PageSkeleton } from '../components/ui/PageState';
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { EmptyState, ErrorState, PageSkeleton, LoadingNotice, SkeletonValue } from '../components/ui/PageState';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import {
   Plus,
@@ -14,21 +14,41 @@ import {
   CircleCheck,
   CircleOff,
   Trash2,
-  Pencil,
-  RotateCcw,
-  ArrowRight,
+  ChevronRight,
 } from 'lucide-react';
 
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import RewardsAnalytics from '../components/rewards/RewardsAnalytics';
 import ClaimVerification from '../components/rewards/ClaimVerification';
+import RewardPopup from '../components/rewards/RewardPopup';
+import RewardCover from '../components/rewards/RewardCover';
 import { useAdminSession } from '../auth/useAdminSession';
 import { hasRole } from '../auth/roles';
 
-export function RewardsView({ remote, initialTab = 'rewards' }) {
-  const { items: rewards, loading, error, busy, model } = remote;
+export function RewardsView({ remote, initialTab = 'rewards', enterPopupHistory }) {
+  const { items: rewards, loading, error, model } = remote;
   const navigate = useNavigate();
+  const location = useLocation();
+  const [selectedId, setSelectedId] = useState(location.state?.rewardPopup ?? null);
+  const openingRef = useRef(!!location.state?.rewardPopup), openerRef = useRef(null), galleryRef = useRef(null);
+  const openReward = (id, event) => {
+    if (openingRef.current) return;
+    openingRef.current = true;openerRef.current = event.currentTarget;
+    openerRef.current.focus({ preventScroll: true });enterPopupHistory?.(id);setSelectedId(id);
+  };
+  const dismiss = useCallback(() => {
+    openingRef.current = false;setSelectedId(null);
+    requestAnimationFrame(() => { if (!openerRef.current?.isConnected) galleryRef.current?.focus({ preventScroll: true }); });
+  }, []);
+  const refresh = useCallback(async () => {
+    await model.load(undefined, { background: true });
+    if (!openingRef.current && !openerRef.current?.isConnected) galleryRef.current?.focus({ preventScroll: true });
+  }, [model]);
+  useEffect(() => {
+    const forward = event => { const id = event.state?.usr?.rewardPopup;if (id) { openingRef.current = true;setSelectedId(id); } };
+    window.addEventListener('popstate', forward);return () => window.removeEventListener('popstate', forward);
+  }, []);
   const { role, mustChangePassword, currentAdmin } = useAdminSession();
   const canVerifyClaims = hasRole(role) && !mustChangePassword;
 
@@ -102,15 +122,6 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
     setSelectedCategory('all');
   };
 
-  const handleDelete = async (id) => {
-    if (!busy && window.confirm('Move this reward to Deleted? It can be recovered for 30 days.')) await model.transition(id, 'delete');
-  };
-  const handleRestore = async (id) => {
-    if (!busy && window.confirm('Restore this reward to Inactive?')) {
-      if (await model.transition(id, 'restore')) setRewardStatusTab('inactive');
-    }
-  };
-
   // ============================================================
   // Reward Status Badge
   // ============================================================
@@ -156,9 +167,9 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
         />
 
         <div className="space-y-6 p-4 lg:p-8">
-          {loading && <PageSkeleton />}
-          {error && <ErrorState title="Unable to complete Rewards request" description={error} onRetry={() => model.load()} />}
-          {!loading && <>
+          <LoadingNotice requestKey={remote.year} loading={loading || remote.refreshing} hasData={remote.hasLoaded || rewards.length > 0} />
+          {error && <ErrorState title="Unable to complete Rewards request" description={error} compact={remote.hasLoaded || rewards.length > 0} status={remote.errorStatus} busy={loading || remote.refreshing} onRetry={() => model.load()} />}
+          {<>
           {/* ==================================================
               Page Heading
               ================================================== */}
@@ -180,7 +191,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                 onClick={() => navigate('/rewards/create')}
                 className="flex min-h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary-hover"
               >
-                <Plus size={18} />
+                <Plus size={18} aria-hidden="true" />
               Add Reward
               </button>
             )}
@@ -191,7 +202,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
               ================================================== */}
           <section className={activeTab !== 'rewards' ? 'hidden' : 'grid gap-4 sm:grid-cols-2 xl:grid-cols-4'}>
             {[
-              { status: 'analytics', label: 'Analytics', icon: Gift, iconClasses: 'bg-selected text-primary' },
+              { status: 'analytics', label: 'Analytics', icon: Gift, iconClasses: 'lf-icon-brand' },
               { status: 'active', label: 'Active', icon: CircleCheck, iconClasses: 'bg-success-surface text-success-foreground' },
               { status: 'inactive', label: 'Inactive', icon: CircleOff, iconClasses: 'bg-gray-100 text-gray-500' },
               { status: 'deleted', label: 'Deleted', icon: Trash2, iconClasses: 'bg-danger-surface text-danger-foreground' },
@@ -200,18 +211,18 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                 onClick={() => { setActiveTab('rewards'); setRewardStatusTab(status); }}
                 aria-label={`Show ${label} rewards`}
                 aria-pressed={activeTab === 'rewards' && rewardStatusTab === status}
-                className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-primary-border hover:bg-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-                  activeTab === 'rewards' && rewardStatusTab === status ? 'border-primary-border bg-selected' : 'border-gray-200 bg-white'
+                className={`min-w-0 cursor-pointer rounded-2xl border p-5 text-left transition hover:border-primary-border hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                  activeTab === 'rewards' && rewardStatusTab === status ? 'border-primary bg-selected' : 'border-gray-200 bg-white hover:bg-primary-soft'
                 }`}>
                 <span className="flex items-center justify-between gap-3">
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium text-gray-500">{label}</span>
+                    <span className="block break-words text-sm font-medium text-gray-500">{label}</span>
                     {status === 'analytics' && <span className="block text-xs text-gray-400">Available Stock</span>}
-                    <span className="mt-2 block text-2xl font-bold text-gray-900">{status === 'analytics' ? availableStock : getCount(status)}</span>
+                    <span className="mt-2 block break-words text-2xl font-bold text-gray-900">{loading && !remote.hasLoaded && !rewards.length ? <SkeletonValue /> : status === 'analytics' ? availableStock : getCount(status)}</span>
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
-                    <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClasses}`}><Icon size={21} aria-hidden="true" /></span>
-                    <ArrowRight size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
+                    <span className={`lf-icon-badge ${iconClasses}`}><Icon size={22} aria-hidden="true" /></span>
+                    <ChevronRight size={18} aria-hidden="true" className="shrink-0 text-primary" />
                   </span>
                 </span>
               </button>
@@ -266,7 +277,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
             </div>
 
             <div id="rewards-analytics" hidden={activeTab !== 'rewards' || rewardStatusTab !== 'analytics'}>
-              <RewardsAnalytics remote={remote} />
+              {activeTab === 'rewards' && rewardStatusTab === 'analytics' && <RewardsAnalytics remote={remote} />}
             </div>
             {activeTab === 'claims' && canVerifyClaims && <ClaimVerification key={currentAdmin?.id ?? role} onClaimed={model.refreshClaims} />}
 
@@ -278,9 +289,8 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                 {/* Search and Filters */}
                 <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">
                   <div className="relative min-w-0 w-full sm:min-w-64 flex-1">
-                    <Search
-                      size={17}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    <Search size={18} aria-hidden="true"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-primary pointer-events-none"
                     />
 
                     <input
@@ -323,36 +333,30 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                 </div>
 
                 {/* Reward Cards */}
-                <div className="grid gap-5 p-6 md:grid-cols-2 xl:grid-cols-3">
-                  {filteredRewards.length > 0 ? (
+                <div ref={galleryRef} tabIndex={-1} aria-label="Reward gallery" className="grid gap-5 p-6 md:grid-cols-2 xl:grid-cols-3">
+                  {loading && !remote.hasLoaded && !rewards.length ? <div className="col-span-full"><PageSkeleton variant="gallery" /></div> : filteredRewards.length > 0 ? (
                     filteredRewards.map((reward) => (
-                      <article
+                      <button type="button" aria-label={`View reward: ${reward.name}`} aria-haspopup="dialog" onClick={event => openReward(reward.id, event)}
                         key={reward.id}
-                        className="overflow-hidden rounded-2xl border border-gray-200 bg-white"
+                        className="min-w-0 cursor-pointer overflow-hidden rounded-2xl border border-gray-200 bg-white text-left transition hover:border-primary-border hover:bg-primary-soft hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                       >
-                        {/* Temporary image placeholder */}
-                        <div className="flex h-44 items-center justify-center bg-gray-100">
-                          {reward.image_url ? <img src={reward.image_url} alt={reward.name} className="h-full w-full object-cover" /> : <>
-                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
-                            <Gift size={27} />
-                          </div></>}
-                        </div>
+                        <RewardCover src={reward.image_url} name={reward.name} />
 
                         <div className="p-5">
                           <div className="flex items-start justify-between gap-3">
-                            <div>
+                            <div className="min-w-0">
                               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                                 LIFEFLOW REWARDS
                               </p>
 
-                              <h3 className="mt-1 font-bold text-gray-800">
+                              <h3 className="mt-1 break-words font-bold text-gray-800">
                                 {reward.name}
                               </h3>
                             </div>
 
                             {renderRewardStatus(reward.status)}
-                            {reward.status === 'deleted' && <p className="mt-2 text-xs text-gray-500">Recoverable for 30 days. Deletion scheduled: {reward.scheduled_for_deletion_at?.slice(0, 10)}. Definitions with voucher history are retained.</p>}
                           </div>
+                          {reward.status === 'deleted' && <p className="mt-2 text-xs text-gray-500">Recoverable for 30 days. Deletion scheduled: {reward.scheduled_for_deletion_at?.slice(0, 10)}. Definitions with voucher history are retained.</p>}
 
                           {/* Points and Stock */}
                           <div className="mt-5 grid grid-cols-2 gap-3">
@@ -377,51 +381,12 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                             </div>
                           </div>
 
-                          {/* Reward Actions */}
-                          <div className="mt-5 flex justify-end gap-2 border-t border-gray-100 pt-4">
-                            {reward.status !== 'deleted' && (
-                              <>
-                                <button
-                                  type="button"
-                                  title="Edit reward"
-                                  disabled={busy}
-                                  onClick={() => navigate(`/rewards/${reward.id}/edit`)}
-                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-selected hover:text-primary"
-                                >
-                                  <Pencil size={17} />
-                                </button>
-
-                                <button
-                                  type="button"
-                                  title="Delete reward" disabled={busy}
-                                  onClick={() =>
-                                    handleDelete(reward.id)
-                                  }
-                                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-danger-surface hover:text-danger-foreground"
-                                >
-                                  <Trash2 size={17} />
-                                </button>
-                              </>
-                            )}
-
-                            {reward.status === 'deleted' && (
-                              <button
-                                type="button"
-                                disabled={busy || !reward.recoverable} title={reward.recoverable ? 'Restore' : 'Recovery period ended; awaiting backend purge'}
-                                onClick={() =>
-                                  handleRestore(reward.id)
-                                }
-                                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-success-surface hover:text-success-foreground"
-                              >
-                                <RotateCcw size={17} />
-                              </button>
-                            )}
-                          </div>
+                          <div className="mt-4 flex justify-end"><ChevronRight size={18} aria-hidden="true" className="shrink-0 text-primary" /></div>
                         </div>
-                      </article>
+                      </button>
                     ))
                   ) : (
-                    <div className="col-span-full"><EmptyState title="No rewards found" /></div>
+                    !loading && !error ? <div className="col-span-full"><EmptyState title={searchTerm.trim() || selectedCategory !== 'all' ? "No rewards match your filters" : rewards.length ? "No rewards in this status" : "No rewards available yet"} description="Try another status or category, or add a reward." /></div> : null
                   )}
                 </div>
               </>
@@ -463,7 +428,7 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                     </tr>
                   </thead>
 
-                  <tbody>
+                  <tbody>{loading && !remote.hasLoaded && !remote.redemptions.length && <tr><td colSpan={5}><PageSkeleton variant="table" header={false} /></td></tr>}
                     {redemptions.map((redemption) => (
                       <tr
                         key={redemption.id}
@@ -495,14 +460,19 @@ export function RewardsView({ remote, initialTab = 'rewards' }) {
                   </tbody>
                 </table>
               </div>
-              {!redemptions.length && <EmptyState title="No redemptions found" />}
+              {!loading && !error && !redemptions.length && <EmptyState title={redemptionSearch.trim() || redemptionStatus || redemptionMonth ? "No redemptions match your filters" : "No redemptions yet"} description="Donor reward purchases will appear here." />}
               </>)}
           </section>
           </>}
         </div>
       </main>
+      {selectedId !== null && <RewardPopup key={selectedId} id={selectedId} onDismiss={dismiss} onChanged={refresh} />}
     </div>
   );
 }
 
-export default function Rewards() { return <RewardsView remote={useRewards()} />; }
+export default function Rewards() {
+  const location = useLocation(), navigate = useNavigate();
+  const enterPopupHistory = id => navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { state: { ...location.state, rewardPopup: id }, preventScrollReset: true });
+  return <RewardsView remote={useRewards()} enterPopupHistory={enterPopupHistory} />;
+}

@@ -309,8 +309,8 @@ export async function checkAdminManagement(server) {
     await detailsModel.openDetails(accounts[1]);
     assert.equal(detailsModel.getSnapshot().modal.unavailable, true);
     inspect(detailsModel.getSnapshot(), nodes => {
-      assert.ok(nodes.some(node => node.props.children === 'Retry Details'));
-      assert.ok(!nodes.some(node => node.props.children === 'Edit Admin'));
+      assert.ok(nodes.some(node => node.props.description === detailsModel.getSnapshot().formError && node.props.onRetry));
+      assert.ok(nodes.find(node => node.props.children === 'Edit Admin').props.disabled, 'Keep cached details visible but block actions until refresh succeeds');
     }, detailsModel);
     listFailure = false; rows = [];
     await detailsModel.openDetails(accounts[1]);

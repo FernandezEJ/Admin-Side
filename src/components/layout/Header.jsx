@@ -15,7 +15,7 @@ function Header({
       <div className="flex min-w-0 items-center gap-3">
         <button type="button" onClick={openMobile} aria-label="Open navigation"
           aria-controls="admin-sidebar" aria-expanded={mobileOpen}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-gray-600 hover:bg-selected hover:text-primary lg:hidden">
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary hover:bg-primary-soft lg:hidden">
           <Menu size={22} aria-hidden="true" />
         </button>
         <div className="min-w-0 break-words">
@@ -31,8 +31,8 @@ function Header({
 
       {/* Admin profile */}
       <div className="flex shrink-0 items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-selected text-primary">
-          <UserRound size={20} />
+        <div className="flex h-10 w-10 items-center justify-center rounded-full lf-icon-brand">
+          <UserRound size={20} aria-hidden="true" />
         </div>
 
         <div className="hidden max-w-40 break-words md:flex md:flex-col">

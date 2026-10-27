@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Megaphone, BadgeCheck, Users, Gift,
-  FileText, UserRoundCog, History,
+  FileText, UserRoundCog, History, BookOpen,
 } from 'lucide-react';
 import { ADMIN_ROLES } from '../../auth/roles';
 
@@ -8,6 +8,7 @@ import { ADMIN_ROLES } from '../../auth/roles';
 export const navigationItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, allowedRoles: [ADMIN_ROLES.ADMIN] },
   { name: 'Announcements', path: '/announcements', icon: Megaphone, allowedRoles: [ADMIN_ROLES.ADMIN] },
+  { name: 'Educational Content', path: '/educational-content', icon: BookOpen, allowedRoles: [ADMIN_ROLES.ADMIN] },
   { name: 'Verification', path: '/verification', icon: BadgeCheck, allowedRoles: [ADMIN_ROLES.ADMIN] },
   { name: 'Donors', path: '/donors', icon: Users, allowedRoles: [ADMIN_ROLES.ADMIN] },
   { name: 'Rewards', path: '/rewards', icon: Gift, allowedRoles: [ADMIN_ROLES.ADMIN] },
