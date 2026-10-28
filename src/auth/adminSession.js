@@ -44,7 +44,9 @@ export function createAdminSession(api = adminAuthApi, tokenStorage = storage) {
       const expectedVersion = version;
       if (!token) throw new AuthApiError('Please sign in again.', 401);
       try {
-        return await operation(token);
+        const result = await operation(token);
+        if (expectedVersion !== version) throw new AuthApiError('Your session changed. Please sign in again.', 401);
+        return result;
       } catch (error) {
         if (error.status === 401) invalidate(error, expectedVersion);
         if (error.status === 403 && expectedVersion === version) await actions.refreshSession();
@@ -63,7 +65,7 @@ export function createAdminSession(api = adminAuthApi, tokenStorage = storage) {
           throw new AuthApiError('Sign-in was cancelled. Please try again.');
         }
         token = result.token;
-        tokenStorage.saveToken(token, credentials.remember ?? true);
+        tokenStorage.saveToken(token);
         update(user);
         return user;
       })().finally(() => { loginPending = null; });

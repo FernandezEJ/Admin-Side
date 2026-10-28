@@ -11,19 +11,27 @@ export function clearToken() {
 }
 
 export function readToken() {
-  for (const name of ['sessionStorage', 'localStorage']) {
-    try {
-      window[name].removeItem(LEGACY_KEY);
-      const token = window[name].getItem(TOKEN_KEY);
-      if (token) return token;
-    } catch { /* Start without a persisted session when storage is unavailable. */ }
-  }
+  let legacy;
+  try {
+    legacy = window.localStorage.getItem(TOKEN_KEY);
+    window.localStorage.removeItem(TOKEN_KEY);
+    window.localStorage.removeItem(LEGACY_KEY);
+  } catch { legacy = null; }
+  try {
+    window.sessionStorage.removeItem(LEGACY_KEY);
+    const token = window.sessionStorage.getItem(TOKEN_KEY);
+    if (token) return token;
+    if (legacy) {
+      window.sessionStorage.setItem(TOKEN_KEY, legacy);
+      return legacy;
+    }
+  } catch { /* An unvalidated legacy token is never restored from persistent storage. */ }
   return null;
 }
 
-export function saveToken(token, remember = true) {
+export function saveToken(token) {
   clearToken();
   try {
-    window[remember ? 'localStorage' : 'sessionStorage'].setItem(TOKEN_KEY, token);
-  } catch { /* Login remains usable in memory. */ }
+    window.sessionStorage.setItem(TOKEN_KEY, token);
+  } catch { /* Login remains usable in memory when browser storage is unavailable. */ }
 }

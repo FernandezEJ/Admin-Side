@@ -42,7 +42,8 @@ export async function checkRealAuth(server) {
       const session = createAdminSession();
       reply = { body: { token: `${role}-token`, user: user(role) } };
       await session.login(credentials);
-      assert.equal(localStorage.getItem(storage.TOKEN_KEY), `${role}-token`);
+      assert.equal(sessionStorage.getItem(storage.TOKEN_KEY), `${role}-token`);
+      assert.equal(localStorage.getItem(storage.TOKEN_KEY), null);
       assert.equal(session.getSnapshot().role, role);
       assert.equal(session.getSnapshot().isAuthenticated, true);
       assert.equal(calls.at(-1).url, `${API_BASE_URL}/admin/login`);
