@@ -52,8 +52,8 @@ export function VerificationProofViewer({ url, type, name, reload }) {
   const turned = rotation % 180 !== 0;
   if (type === 'application/pdf') return <div className="verification-proof-pdf">
     {name && <p className="verification-proof-pdf-name">{name}</p>}
-    <iframe src={url} title="Submitted donation proof PDF" referrerPolicy="no-referrer" />
-    <a href={url} target="_blank" rel="noopener noreferrer">Open PDF</a>
+    <p>Download the PDF to review it in your preferred PDF reader.</p>
+    <a href={url} download="donation-proof.pdf">Download PDF</a>
   </div>;
   return <div className="verification-proof-viewer">
     <div className="verification-proof-toolbar">

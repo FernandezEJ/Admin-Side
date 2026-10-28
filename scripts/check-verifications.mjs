@@ -196,7 +196,8 @@ export async function checkVerifications(server) {
     mime = 'application/pdf'; await detail.openProof();
     assert.deepEqual(urls.revoked, ['blob:proof-1']);
     html = render(VerificationDetailView, { ...detail.getSnapshot(), model: detail });
-    assert.ok(html.includes('Open PDF') && html.includes('noopener noreferrer'));
+    assert.ok(html.includes('Download PDF') && html.includes('download="donation-proof.pdf"'));
+    assert.ok(!/<(?:iframe|object|embed)\b/.test(html));
     mime = 'text/html'; await detail.openProof();
     assert.equal(detail.getSnapshot().proofUrl, '');
     assert.match(detail.getSnapshot().proofError, /format/);
@@ -357,7 +358,11 @@ export async function checkVerifications(server) {
     }
     renderToString(React.createElement(ExerciseProof));
     const pdf = renderToString(React.createElement(VerificationProofViewer, { url: 'blob:pdf-proof', type: 'application/pdf', name: 'proof.pdf' }));
-    assert.ok(pdf.includes('<iframe') && pdf.includes('Open PDF') && pdf.includes('noopener noreferrer'));
+    for (const markup of [pdf, render(VerificationDetailView, { ...drawerRemote, proofUrl: 'blob:pdf-proof', proofType: 'application/pdf' })]) {
+      assert.ok(markup.includes('Download PDF') && markup.includes('download="donation-proof.pdf"') && markup.includes('href="blob:pdf-proof"'));
+      assert.ok(!/<(?:iframe|object|embed)\b/.test(markup), 'Untrusted PDFs must never be embedded in the Admin origin');
+      assert.ok(!markup.includes('Open PDF'), 'PDFs use explicit downloads rather than a new same-origin Blob tab');
+    }
     // In-flight detail, proof and review requests are discarded after close/switch.
     let finishDetail, finishProof, finishReview;
     const raceUrls = { created: [], revoked: [], createObjectURL() { this.created.push('blob:race'); return 'blob:race'; }, revokeObjectURL(url) { this.revoked.push(url); } };
@@ -391,7 +396,7 @@ export async function checkVerifications(server) {
     const css = readFileSync('src/styles/verification-review.css', 'utf8');
     for (const value of ['width: min(1080px, calc(100vw - 48px))', 'margin: auto', 'inset: 0;', 'grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr)', 'overflow-y: auto', '::backdrop', '.verification-review-footer', 'flex: none', '@media (max-width: 720px)', '@media (max-width: 479px)']) assert.ok(css.includes(value), value);
     assert.ok(!css.includes('inset: 0 0 0 auto') && !css.includes('clamp(354px'));
-    console.log('Verification checks passed: four count/status cards without duplicate tabs; five-column row-only table with one chevron per record; click/Enter/Space for both roles/all statuses, repeat/nested/duplicate guards and retained search/month/year after close/decision; unchanged centered review, private image/PDF/zoom/rotate/Blob cleanup, confirmations/reasons/duplicate-submit guards, refresh/errors/stale-version recovery and deep links.');
+    console.log('Verification checks passed: four count/status cards without duplicate tabs; five-column row-only table with one chevron per record; click/Enter/Space for both roles/all statuses, repeat/nested/duplicate guards and retained search/month/year after close/decision; centered review, private images/PDF downloads/zoom/rotate/Blob cleanup, confirmations/reasons/duplicate-submit guards, refresh/errors/stale-version recovery and deep links.');
   } finally { globalThis.fetch = originalFetch; }
 }
 

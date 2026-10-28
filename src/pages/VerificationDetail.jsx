@@ -75,7 +75,9 @@ export function VerificationDetailView({ remote }) {
                   <FileText size={28} aria-hidden="true" className="text-primary" /><p className="max-w-full break-words font-semibold text-gray-700">{item.proof.name}</p>
                   <p className="text-xs text-gray-500">{item.proof.mime_type} / {Math.ceil((item.proof.size || 0) / 1024)} KB</p>
                   {proofUrl && proofType.startsWith('image/') && <img src={proofUrl} alt="Submitted donation proof" className="max-h-[600px] max-w-full object-contain" />}
-                  {proofUrl && <a href={proofUrl} target="_blank" rel="noopener noreferrer" className={button}>{proofType === 'application/pdf' ? 'Open PDF' : 'Open Image'}</a>}
+                  {proofUrl && (proofType === 'application/pdf'
+                    ? <a href={proofUrl} download="donation-proof.pdf" className={button}>Download PDF</a>
+                    : <a href={proofUrl} target="_blank" rel="noopener noreferrer" className={button}>Open Image</a>)}
                   <button type="button" disabled={proofLoading} onClick={model.openProof} className={button}>{proofLoading ? 'Loading proof...' : proofUrl ? 'Reload Proof' : 'Open Proof'}</button>
                   {proofError && <p role="alert" className="text-sm text-danger-foreground">{proofError}</p>}
                 </> : <p className="text-sm text-gray-500">No proof has been submitted.</p>}
