@@ -12,6 +12,7 @@ const invalidUrls = [undefined, '', 'invalid', '/api', 'http://api.example.test/
   'https://api.example.test\\api'];
 
 export async function checkSessionSecurity(server) {
+  await checkNgrokTransport();
   const { resolveApiBaseUrl } = await server.ssrLoadModule('/src/services/apiUrl.js');
   for (const value of invalidUrls) assert.throws(() => resolveApiBaseUrl(value, false), /VITE_API_BASE_URL/);
   for (const value of ['https://api.example.test/api', 'https://staging.example.test:8443/api/', 'https://[2001:4860:4860::8888]/api']) {
@@ -96,6 +97,89 @@ export async function checkSessionSecurity(server) {
   await session.logout();
   rememberEmail('', false, localStorage);
   console.log('Session/HTTPS security checks passed: release fail-closed transport, dev LAN, exact API path, tab storage, legacy migration, remembered email independence, expiry cleanup and stale-response isolation.');
+}
+
+export async function checkNgrokTransport() {
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const [base, expected, development = false] of [
+      ['https://creative-fernlike-envy.ngrok-free.dev/api', true],
+      ['https://SYNTHETIC-123.ngrok-free.dev/api/', true],
+      ['https://api.example.test/api', false],
+      ['https://ngrok-free.dev/api', false],
+      ['https://api.ngrok-free.dev.attacker.test/api', false],
+      ['https://not-ngrok-free.dev/api', false],
+      ['https://api-ngrok-free.dev/api', false],
+      ['http://localhost:8000/api', false, true],
+      ['http://127.0.0.1:8000/api', false, true],
+      ['http://synthetic.ngrok-free.dev/api', false, true],
+    ]) {
+      const transport = await createServer({ configFile: false, envFile: false, logLevel: 'silent',
+        server: { middlewareMode: true }, define: {
+          'import.meta.env.DEV': String(development), 'import.meta.env.PROD': String(!development),
+          'import.meta.env.VITE_API_BASE_URL': JSON.stringify(base),
+        } });
+      const calls = [];
+      let reply = () => new Response(JSON.stringify({ user: null }), { headers: { 'Content-Type': 'application/json' } });
+      globalThis.fetch = async (url, options) => {
+        const parsed = new URL(url);
+        assert.equal(parsed.origin, new URL(base).origin);
+        assert.equal(options.credentials, 'omit');
+        assert.equal(options.headers.Accept, 'application/json');
+        assert.equal(options.headers['ngrok-skip-browser-warning'], expected ? '1' : undefined);
+        assert.ok(options.signal instanceof AbortSignal);
+        calls.push({ url, options });
+        return reply();
+      };
+      try {
+        const { adminAuthApi, adminRequest, AuthApiError } = await transport.ssrLoadModule('/src/services/adminAuthApi.js');
+        const { dashboardApi } = await transport.ssrLoadModule('/src/services/dashboardApi.js');
+        const { permanentPostApi } = await transport.ssrLoadModule('/src/services/permanentPostApi.js');
+        const { verificationsApi } = await transport.ssrLoadModule('/src/services/verificationsApi.js');
+        const credentials = { email: 'synthetic@example.test', password: 'synthetic-only' };
+        await adminAuthApi.login(credentials);
+        assert.equal(new URL(calls.at(-1).url).pathname, '/api/admin/login');
+        assert.equal(calls.at(-1).options.method, 'POST');
+        assert.equal(calls.at(-1).options.headers.Authorization, undefined);
+        assert.equal(calls.at(-1).options.headers['Content-Type'], 'application/json');
+        assert.deepEqual(JSON.parse(calls.at(-1).options.body), credentials);
+        await adminAuthApi.me('synthetic-token');
+        assert.equal(new URL(calls.at(-1).url).pathname, '/api/admin/me');
+        assert.equal(calls.at(-1).options.headers.Authorization, 'Bearer synthetic-token');
+        assert.equal(calls.at(-1).options.headers['Content-Type'], undefined);
+        await dashboardApi.load('synthetic-token', 6);
+        assert.equal(new URL(calls.at(-1).url).pathname, '/api/admin/dashboard');
+        assert.equal(new URL(calls.at(-1).url).searchParams.get('months'), '6');
+        assert.equal(calls.at(-1).options.headers.Authorization, 'Bearer synthetic-token');
+        reply = () => new Response(JSON.stringify({ post: { id: 1 } }), { headers: { 'Content-Type': 'application/json' } });
+        assert.deepEqual(await permanentPostApi.save('synthetic-token', { title: 'Synthetic', summary: 'Summary', description: 'Description' },
+          new Blob(['fixture'], { type: 'image/png' })), { id: 1 });
+        const multipart = calls.at(-1).options;
+        assert.equal(multipart.method, 'POST');
+        assert.equal(multipart.headers.Authorization, 'Bearer synthetic-token');
+        assert.equal(multipart.headers['Content-Type'], undefined, 'Fetch must supply the multipart boundary');
+        assert.ok(multipart.body instanceof FormData);
+        assert.equal(multipart.body.get('_method'), 'PUT');
+        assert.equal(multipart.body.get('image').size, 7);
+        reply = () => new Response(new Blob(['proof'], { type: 'image/png' }), { headers: { 'Content-Type': 'image/png' } });
+        assert.equal(await (await verificationsApi.proof('synthetic-token', 1)).text(), 'proof');
+        assert.equal(calls.at(-1).options.headers.Authorization, 'Bearer synthetic-token');
+        reply = () => new Response(JSON.stringify({ message: 'Validation failed.', errors: { title: ['Required.'] } }),
+          { status: 422, headers: { 'Content-Type': 'application/json' } });
+        await assert.rejects(adminRequest('/announcements', { token: 'synthetic-token', method: 'POST', body: {} }), error => {
+          assert.ok(error instanceof AuthApiError); assert.equal(error.status, 422);
+          assert.deepEqual(error.errors, { title: ['Required.'] }); return true;
+        });
+        reply = () => new Response(JSON.stringify({ message: 'PRIVATE-SERVER-CANARY' }), { status: 500 });
+        await assert.rejects(adminAuthApi.me('synthetic-token'), /The server is unavailable/);
+        reply = () => new Response('synthetic warning', { headers: { 'Content-Type': 'text/plain' } });
+        await assert.rejects(adminAuthApi.me('synthetic-token'), /The server returned an invalid response/);
+        reply = () => { throw new TypeError('PRIVATE-NETWORK-CANARY'); };
+        await assert.rejects(adminAuthApi.me('synthetic-token'), /Unable to reach the server/);
+      } finally { await transport.close(); }
+    }
+    console.log('Ngrok transport checks passed: 10 API bases, login, me, dashboard, multipart, proof Blob, safe errors and exact host matching; all fetches mocked.');
+  } finally { globalThis.fetch = originalFetch; }
 }
 
 export async function checkReleaseBuildSecurity() {

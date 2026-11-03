@@ -16,9 +16,13 @@ export async function adminRequest(path, { token, body, method = 'GET', response
   const timeout = setTimeout(() => controller.abort(), 15000);
   const multipart = body instanceof FormData;
   try {
-    const response = await fetch(`${API_BASE_URL}/admin${path}`, {
+    const url = `${API_BASE_URL}/admin${path}`;
+    const target = new URL(url);
+    const ngrok = target.protocol === 'https:' && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.ngrok-free\.dev$/.test(target.hostname);
+    const response = await fetch(url, {
       method, credentials: 'omit',
       headers: { Accept: 'application/json',
+        ...(ngrok ? { 'ngrok-skip-browser-warning': '1' } : {}),
         ...(body && !multipart ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
