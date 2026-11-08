@@ -12,7 +12,7 @@ export async function checkDonors(server) {
   const render = (remote, role = 'admin') => renderToString(React.createElement(MemoryRouter, null,
     React.createElement(AdminSessionContext.Provider, { value: { role, isSuperAdmin: role === 'super_admin',
       currentAdmin: { name: 'Reviewer' } } }, React.createElement(DonorsView, { remote })))).replace(/<!--.*?-->/g, '');
-  const fixture = { summary: { totalDonors: 6, eligible: 2, temporarilyIneligible: 2 }, donors: [
+  const fixture = { summary: { totalDonors: 6, eligible: 2, temporarilyIneligible: 2 }, assessment_counts: { basic_requirements_met: 0, needs_further_review: 0 }, donors: [
     { id: 9, name: '<script>New donor</script>', bloodType: null, eligibility: 'unassessed', totalDonations: 0, achievement: 'New Donor', joinedDate: null },
     { id: 7, name: 'First donor', bloodType: 'O+', eligibility: 'eligible', totalDonations: 1, achievement: 'First-Time Donor', joinedDate: '2026-09-04' },
     { id: 2, name: 'Bronze donor', bloodType: 'A-', eligibility: 'temporarily_ineligible', totalDonations: 3, achievement: 'Bronze Donor', joinedDate: '2026-09-04' },
@@ -61,9 +61,9 @@ export async function checkDonors(server) {
     const metrics = (html) => [...html.matchAll(/<h3 class="mt-2 text-2xl font-bold text-gray-900">(\d+)<\/h3>/g)].map((match) => Number(match[1]));
     for (const role of ['admin', 'super_admin']) {
       const html = render(remote(), role);
-      assert.deepEqual(metrics(html), [6, 2, 2]);
-      for (const text of ['Total Donors', 'Eligible', 'Temporarily Ineligible', 'All Donors', 'Top Donors', 'Blood Type', 'Achievement',
-        'Not Assessed', 'Needs Screening', 'Unknown', 'Joined Unknown', 'Sep 4, 2026', 'First-Time Donor', 'Bronze Donor', 'Silver Donor', 'Gold Donor', 'New Donor']) assert.ok(html.includes(text), text);
+      assert.deepEqual(metrics(html), [6, 0, 0]);
+      for (const text of ['Total Donors', 'Basic Requirements Met', 'Needs Further Review', 'All Donors', 'Top Donors', 'Blood Type', 'Achievement',
+        'No Current Self-Assessment', 'Unknown Result', 'Unknown', 'Joined Unknown', 'Sep 4, 2026', 'First-Time Donor', 'Bronze Donor', 'Silver Donor', 'Gold Donor', 'New Donor']) assert.ok(html.includes(text), text);
       assert.ok(html.includes('&lt;script&gt;New donor&lt;/script&gt;') && !html.includes('<script>New donor'));
       const table = html.match(/<table\b[\s\S]*?<\/table>/)[0];
       assert.equal((table.match(/<th /g) ?? []).length, 5);
@@ -76,7 +76,7 @@ export async function checkDonors(server) {
     await model.setSearchTerm(' bRoNzE ');
     assert.deepEqual(visible(), [2]);
     assert.ok(render(remote()).includes('Bronze donor') && !render(remote()).includes('Gold donor'));
-    assert.deepEqual(metrics(render(remote())), [6, 2, 2], 'Filtering never changes system summary');
+    assert.deepEqual(metrics(render(remote())), [6, 0, 0], 'Filtering never changes system summary');
     await model.setSearchTerm(' o+ ');
     assert.deepEqual(visible(), [7, 4]);
     await model.setSelectedBloodType('A-');
@@ -211,7 +211,7 @@ export async function checkDonors(server) {
     await retry;
     assert.equal(model.getSnapshot().error, '');
     assert.ok(render(remote()).includes('Gold donor'));
-    response = { summary: { totalDonors: 0, eligible: 0, temporarilyIneligible: 0 }, donors: [], topDonors: [], bloodTypes: [],
+    response = { summary: { totalDonors: 0, eligible: 0, temporarilyIneligible: 0 }, assessment_counts: { basic_requirements_met: 0, needs_further_review: 0 }, donors: [], topDonors: [], bloodTypes: [],
       pagination: { currentPage: 1, lastPage: 1, perPage: 20, total: 0 } };
     await model.load();
     assert.ok(render(remote()).includes('No donors registered'));

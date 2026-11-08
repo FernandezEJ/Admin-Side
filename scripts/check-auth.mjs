@@ -22,6 +22,7 @@ import { checkSystemReports } from './check-system-reports.mjs';
 import { checkSidebar } from './check-sidebar.mjs';
 import { checkPageStates } from './check-page-states.mjs';
 import { checkUiConsistency } from './check-ui-consistency.mjs';
+import { checkAssessmentCompatibility } from './check-assessment-compatibility.mjs';
 
 const server = await createServer({ server: { middlewareMode: true } });
 // The small approved Flowie derivative is served directly; do not inline the 2 MB source SVG.
@@ -369,6 +370,7 @@ try {
   await checkSidebar(server);
   await checkPageStates(server);
   await checkUiConsistency(server);
+  await checkAssessmentCompatibility(server);
   assert.equal(hasRole('unknown'), false);
   assert.equal(hasRole(ADMIN_ROLES.ADMIN, []), false);
   process.stdout.write('Auth/navigation checks passed: both sidebars, protected routes, restricted pages, legacy URLs, persistence, logout, invalid sessions.\n');

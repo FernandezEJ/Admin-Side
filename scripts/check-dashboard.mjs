@@ -11,7 +11,7 @@ export async function checkDashboard(server) {
   const render = (remote, isSuperAdmin = false) => renderToString(React.createElement(MemoryRouter, null,
     React.createElement(AdminSessionContext.Provider, { value: { role: isSuperAdmin ? 'super_admin' : 'admin', isSuperAdmin,
       currentAdmin: { name: 'Reviewer' } } }, React.createElement(DashboardView, { remote }))));
-  const fixture = { months: 6, timezone: 'Asia/Manila', stats: { donors: 71, eligible: 45, not_eligible: 20 },
+  const fixture = { months: 6, timezone: 'Asia/Manila', stats: { donors: 71, eligible: 45, not_eligible: 20 }, assessment_counts: { basic_requirements_met: 30, needs_further_review: 12 },
     donation_activity: [{ period: '2026-09', month: 'Sep', donations: 11 }],
     blood_types: [{ bloodType: 'O+', count: 37 }],
     recent_verifications: [{ id: 91, donor: '<script>Real donor</script>', bloodType: 'O+', event: 'API donation drive',
@@ -38,8 +38,8 @@ export async function checkDashboard(server) {
     assert.equal(model.getSnapshot().data.stats.donors, 71);
     assert.equal(model.getSnapshot().data.donation_activity[0].donations, 11);
     let html = render(remote());
-    for (const label of ['Donors', 'Total Eligible', 'Total Not Eligible', 'Donation Activity', 'Blood Types', 'Recent Verification Requests',
-      'Last 6 months', 'Last 12 months', 'API donation drive', 'Need Revision', 'Oct 1, 2026', '37', '71', '45', '20']) assert.ok(html.includes(label), label);
+    for (const label of ['Donors', 'Basic Requirements Met', 'Needs Further Review', 'Donation Activity', 'Blood Types', 'Recent Verification Requests',
+      'Last 6 months', 'Last 12 months', 'API donation drive', 'Need Revision', 'Oct 1, 2026', '37', '71', '30', '12']) assert.ok(html.includes(label), label);
     assert.ok(html.includes('href="/verification/91"') && html.includes('href="/verification"'));
     assert.ok(html.includes('&lt;script&gt;Real donor&lt;/script&gt;') && !html.includes('<script>Real donor'));
     assert.ok(!html.includes('Super Admin Overview'));
@@ -94,7 +94,7 @@ export async function checkDashboard(server) {
     html = render(remote());
     assert.equal(card(html, 'Donors')[1], 'a');
     assert.ok(card(html, 'Donors')[2].includes('href="/donors"'));
-    for (const label of ['Total Eligible', 'Total Not Eligible']) assert.equal(card(html, label)[1], 'article');
+    for (const label of ['Basic Requirements Met', 'Needs Further Review']) assert.equal(card(html, label)[1], 'article');
     assert.equal((html.match(/<h2 class="mt-6 text-3xl font-bold text-gray-900">/g) ?? []).length, 3);
     assert.ok(html.includes('focus-visible:outline') && html.includes('cursor-pointer'));
     assert.ok(!html.includes('Admin accounts'));
@@ -106,7 +106,7 @@ export async function checkDashboard(server) {
     assert.equal(card(html, 'Rewards Redeemed')[1], 'article');
     assert.equal((html.match(/<h2 class="mt-6 text-3xl font-bold text-gray-900">/g) ?? []).length, 3);
     assert.ok(calls.every((url) => url.pathname === '/api/admin/dashboard'), 'No new verification/count API calls');
-    const zero = { ...fixture, stats: { donors: 0, eligible: 0, not_eligible: 0 },
+    const zero = { ...fixture, stats: { donors: 0, eligible: 0, not_eligible: 0 }, assessment_counts: { basic_requirements_met: 0, needs_further_review: 0 },
       donation_activity: [{ month: 'Sep', donations: 0 }], blood_types: [{ bloodType: 'O+', count: 0 }], recent_verifications: [] };
     html = render({ ...remote(), data: zero });
     for (const label of ['No completed donations in this period', 'No blood type data', 'No verification requests']) assert.ok(html.includes(label));

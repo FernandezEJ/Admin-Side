@@ -1,4 +1,5 @@
 import ReportChart from '../components/ReportChart';
+import AssessmentBreakdown from '../components/AssessmentBreakdown';
 import { EmptyState, ErrorState, PageSkeleton, LoadingNotice } from '../components/ui/PageState';
 import { formatDonorName } from '../services/staffNames';
 import {
@@ -38,10 +39,11 @@ export function SystemReportsView({ remote }) {
   const months = reportMonths;
   const currentYear = Number(currentReportPeriod().year);
   const report = snapshot?.data;
+  const monthlyNotes = (report?.notes ?? '')
+    .replace('Donor Summary uses all current active registered donor accounts and their latest saved assessments, regardless of the selected period. ', '')
+    .replace('Preliminary self-assessment results are separate from historical questionnaire results; final screening is performed by qualified personnel. ', '');
   const reportData = report ? {
     totalDonors: report.donor_summary.total,
-    eligibleDonors: report.donor_summary.eligible,
-    temporarilyIneligible: report.donor_summary.not_eligible,
     completedDonations: report.donation_summary.completed,
     forVerification: report.donation_summary.for_verification,
     rejected: report.donation_summary.rejected,
@@ -212,25 +214,7 @@ export function SystemReportsView({ remote }) {
                     </span>
                 </div>
 
-                <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">
-                    Eligible
-                    </span>
-
-                    <span className="font-bold text-gray-800">
-                    {reportData.eligibleDonors}
-                    </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-4 text-sm">
-                    <span className="text-gray-500">
-                    Not Eligible
-                    </span>
-
-                    <span className="font-bold text-gray-800">
-                    {reportData.temporarilyIneligible}
-                    </span>
-                </div>
+                <AssessmentBreakdown counts={report.assessment_counts} total={reportData.totalDonors} />
                 </div>
             </article>
 
@@ -543,7 +527,7 @@ export function SystemReportsView({ remote }) {
                 ================================================== */}
             <section className="text-sm text-gray-600">
               <h3 className="mb-2 font-bold">Monthly Notes</h3>
-              <p>{report.notes}</p>
+              <p>{monthlyNotes}</p>
               <p className="mt-2">Generated on: {generatedLabel} (Philippine time, UTC+8)</p>
             </section>
             <footer className="border-t border-gray-200 pt-5 text-center">

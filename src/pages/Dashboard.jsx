@@ -29,14 +29,16 @@ import { Link } from 'react-router-dom';
 import { EmptyState, ErrorState, PageSkeleton, LoadingNotice } from '../components/ui/PageState';
 import { useDashboard } from '../services/useDashboard';
 import { BLOOD_TYPE_COLORS } from '../data/bloodTypeColors';
+import { currentAssessmentCounts } from '../services/assessmentPresentation';
 
 export function DashboardView({ remote }) {
   const { isSuperAdmin } = useAdminSession();
   const { data, loading, error, chartLoading, chartError, months, model } = remote;
+  const assessment = currentAssessmentCounts(data?.assessment_counts, data?.stats.donors);
   const dashboardStats = data ? [
     { title: 'Donors', value: data.stats.donors, description: 'Active registered donors', icon: Users, to: '/donors' },
-    { title: 'Total Eligible', value: data.stats.eligible, description: 'Based on latest saved assessment', icon: CircleCheck, iconClasses: 'bg-success-surface text-success-foreground' },
-    { title: 'Total Not Eligible', value: data.stats.not_eligible, description: 'Based on latest saved assessment', icon: Clock3, iconClasses: 'bg-warning-surface text-warning-foreground' },
+    { title: 'Basic Requirements Met', value: assessment.basic ?? '—', description: 'Current preliminary self-assessment', icon: CircleCheck, iconClasses: 'bg-success-surface text-success-foreground' },
+    { title: 'Needs Further Review', value: assessment.review ?? '—', description: 'Current preliminary self-assessment', icon: Clock3, iconClasses: 'bg-warning-surface text-warning-foreground' },
   ] : [];
   const donationActivity = data?.donation_activity ?? [];
   const bloodTypeData = data?.blood_types ?? [];

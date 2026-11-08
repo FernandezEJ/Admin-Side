@@ -15,6 +15,7 @@ import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 
 import { useDonors } from '../services/useDonors';
+import { currentAssessmentCounts, donorAssessment } from '../services/assessmentPresentation';
 
 export function DonorsView({ remote }) {
   const { data, loading, error, activeTab, searchTerm, selectedBloodType, selectedEligibility, model } = remote;
@@ -56,8 +57,7 @@ export function DonorsView({ remote }) {
   };
 
   const totalDonors = data?.summary.totalDonors;
-  const eligibleDonors = data?.summary.eligible;
-  const temporarilyIneligibleDonors = data?.summary.temporarilyIneligible;
+  const assessment = currentAssessmentCounts(data?.assessment_counts, totalDonors);
   const bloodTypes = data?.bloodTypes ?? [];
   const pagination = data?.pagination ?? { currentPage: 1, lastPage: 1 };
 
@@ -72,25 +72,11 @@ export function DonorsView({ remote }) {
   // Eligibility Badge
   // ============================================================
 
-  const renderEligibility = (eligibility) => {
-    if (eligibility === 'eligible') {
-      return (
-        <span className="inline-flex rounded-full bg-success-surface px-3 py-1.5 text-xs font-semibold text-success-foreground">
-          Eligible
-        </span>
-      );
-    }
-
-    if (eligibility === 'unassessed') {
-      return <span className="inline-flex rounded-full bg-neutral-surface px-3 py-1.5 text-xs font-semibold text-neutral-foreground">Not Assessed</span>;
-    }
-    if (eligibility !== 'temporarily_ineligible') {
-      return <span className="inline-flex rounded-full bg-warning-surface px-3 py-1.5 text-xs font-semibold text-warning-foreground">Needs Screening</span>;
-    }
-
+  const renderEligibility = (donor) => {
+    const state = donorAssessment(donor);
     return (
-      <span className="inline-flex rounded-full bg-warning-surface px-3 py-1.5 text-xs font-semibold text-warning-foreground">
-        Temporarily Ineligible
+      <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${state.classes}`}>
+        {state.label}
       </span>
     );
   };
@@ -148,11 +134,11 @@ export function DonorsView({ remote }) {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500">
-                    Eligible
+                    Basic Requirements Met
                   </p>
 
                   <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {!data && loading ? <SkeletonValue /> : eligibleDonors ?? '—'}
+                    {!data && loading ? <SkeletonValue /> : assessment.basic ?? '—'}
                   </h3>
                 </div>
 
@@ -166,11 +152,11 @@ export function DonorsView({ remote }) {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500">
-                    Temporarily Ineligible
+                    Needs Further Review
                   </p>
 
                   <h3 className="mt-2 text-2xl font-bold text-gray-900">
-                    {!data && loading ? <SkeletonValue /> : temporarilyIneligibleDonors ?? '—'}
+                    {!data && loading ? <SkeletonValue /> : assessment.review ?? '—'}
                   </h3>
                 </div>
 
@@ -267,18 +253,12 @@ export function DonorsView({ remote }) {
                     className="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 outline-none focus:border-primary"
                   >
                     <option value="all">
-                      All Eligibility
+                      All Assessments
                     </option>
 
-                    <option value="eligible">
-                      Eligible
-                    </option>
-
-                    <option value="temporarily_ineligible">
-                      Temporarily Ineligible
-                    </option>
-                    <option value="unassessed">Not Assessed</option>
-                    <option value="indeterminate">Needs Screening</option>
+                    <option value="basic_requirements_met">Basic Requirements Met</option>
+                    <option value="needs_further_review">Needs Further Review</option>
+                    <option value="unknown">Unknown Result</option>
                   </select>
 
                   <button
@@ -306,7 +286,7 @@ export function DonorsView({ remote }) {
                         </th>
 
                         <th className="w-[22%] px-3 py-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                          Eligibility
+                          Assessment
                         </th>
 
                         <th className="w-[15%] px-3 py-4 text-center text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -345,7 +325,7 @@ export function DonorsView({ remote }) {
 
                           <td className="px-3 py-5">
                             {renderEligibility(
-                              donor.eligibility
+                              donor
                             )}
                           </td>
 
